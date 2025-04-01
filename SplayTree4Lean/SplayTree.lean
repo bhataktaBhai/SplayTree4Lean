@@ -7,12 +7,14 @@ inductive SplayTree (α : Type)
 
 namespace SplayTree
 
+/-- Rotates the edge joining the supplied node and its left child, if it exists. -/
 def rotateLeftChild {α : Type} : SplayTree α → SplayTree α
-  | node x (node y A B) C => node y A (node x B C)
+  | node y (node x xL xR) yR => node x xL (node y xR yR)
   | t => t
 
+/-- Rotates the edge joining the supplied node and its right child, if it exists. -/
 def rotateRightChild {α : Type} : SplayTree α → SplayTree α
-  | node x A (node y B C) => node y (node x A B) C
+  | node y yL (node x xL xR) => node x (node y yL xL) xR
   | t => t
 
 /--
@@ -82,9 +84,11 @@ def splay {α : Type} [LinearOrder α] (x : α) (t : SplayTree α) : SplayTree �
   | .right => rotateRightChild t'
   | .idk => t'
 
+/-- Alias for `splay`. -/
 def find {α : Type} [LinearOrder α] (x : α) (t : SplayTree α) : SplayTree α :=
   splay x t
 
+/-- Doesn't work, needs rewriting `splay`. -/
 def split {α : Type} [LinearOrder α] (x : α) (t : SplayTree α) : SplayTree α × SplayTree α :=
   let t' := splay x t
   match t' with
@@ -100,6 +104,7 @@ def join {α : Type} [LinearOrder α] (A B : SplayTree α) : SplayTree α :=
   | _, nil => A
   | node y A1 A2, _ => node y A1 (join A2 B)
 
+/-- Doesn't work, needs rewriting `splay`. -/
 def insert {α : Type} [LinearOrder α] (x : α) (t : SplayTree α) : SplayTree α :=
   let (L, R) := split x t
   node x L R
@@ -110,9 +115,11 @@ def delete {α : Type} [LinearOrder α] (x : α) (t : SplayTree α) : SplayTree 
   | nil => nil
   | node y A B => if y = x then join A B else t'
 
+/-- Builds a `SplayTree` from a `List` by inserting its elements one-by-one. -/
 def fromList {α : Type} [LinearOrder α] (L : List α) : SplayTree α :=
   L.foldl (fun t x => insert x t) nil
 
+/-- Returns the elements of the tree in order. -/
 def toList {α : Type} : SplayTree α → List α
   | nil => []
   | node x l r => toList l ++ [x] ++ toList r
@@ -122,11 +129,13 @@ end SplayTree
 section demo
 open SplayTree
 
+/-- Doesn't work, needs rewriting `splay`. -/
 def exampleTree1 : SplayTree Nat :=
   insert 10 (insert 20 (insert 30 (insert 25 (insert 5 (insert (15 : ℕ) SplayTree.nil)))))
 
 def L : List Nat := [5, 3, 8, 1, 4, 7, 9]
 
+/-- Doesn't work, needs rewriting `splay`. -/
 def exampleTree2 : SplayTree Nat :=
   fromList L
 

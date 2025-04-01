@@ -1,5 +1,5 @@
-import Mathlib.Order.Basic
-import SplayTree4Lean.LinOrdNat
+import Mathlib.Order.Basic -- for LinearOrder
+import Mathlib.Data.Nat.Basic -- for LinearOrder Nat
 
 inductive SplayTree (α : Type)
   | empty : SplayTree α

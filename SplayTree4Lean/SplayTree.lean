@@ -1,11 +1,21 @@
 import Mathlib.Order.Basic -- for LinearOrder
 import Mathlib.Data.Nat.Basic -- for LinearOrder Nat
+import Mathlib.Data.Nat.MaxPowDiv -- for maxPowDiv
 
 inductive SplayTree (α : Type)
   | nil : SplayTree α
   | node (val : α) (left right : SplayTree α) : SplayTree α
+  deriving DecidableEq
 
 namespace SplayTree
+
+def toStr {α : Type} [ToString α] (header : String) : SplayTree α → String
+  | nil => header ++ "nil\n"
+  | node y yL yR => header ++ toString y ++ "\n" ++ toStr header' yL ++ toStr header' yR
+      where header' := header ++ "    "
+
+instance {α : Type} [ToString α] : ToString (SplayTree α) where
+  toString := toStr ""
 
 /-- Rotates the edge joining the supplied node and its left child, if it exists. -/
 def rotateLeftChild {α : Type} : SplayTree α → SplayTree α
@@ -144,5 +154,47 @@ def exampleTree2 : SplayTree Nat :=
 #eval find 15 exampleTree1
 #eval find 5 exampleTree1
 #eval delete 5 exampleTree1
+
+
+/-! Time for some unit testing. -/
+
+-- The subtree of the infinite complete binary tree with r at the root
+def ctf (r : Nat) : SplayTree Nat :=
+  let h := Nat.maxPowDiv 2 r
+  if h = 0 then
+    node r nil nil
+  else
+    node r (ctf (r - 2 ^ (h - 1))) (ctf (r + 2 ^ (h - 1)))
+termination_by Nat.maxPowDiv 2 r
+decreasing_by sorry; sorry -- why do I need two of them?
+
+def tree4 : SplayTree Nat := ctf 4
+#eval! tree4
+#eval! find 4 tree4 -- root
+#eval! find 2 tree4 -- zig
+#eval! find 1 tree4 -- ziz-zig
+#eval! find 3 tree4 -- zig-zag
+
+def tree16 : SplayTree Nat := ctf 16
+#eval! find 8 tree16 -- zig
+#eval! find 4 tree16 -- zig-zig
+#eval! find 12 tree16 -- zig-zag
+#eval! find 2 tree16 -- ziz-zig then zig
+#eval! find 6 tree16 -- ziz-zag then zig
+#eval! find 1 tree16 -- ziz-zig then zig-zig
+#eval! find 3 tree16 -- ziz-zag then zig-zig
+#eval! find 15 tree16 -- ziz-zig then zig-zag
+#eval! find 19 tree16 -- ziz-zag then zig-zag
+
+#guard find 8 tree16 = node 8 (ctf 4) (node 16 (ctf 12) (ctf 24))
+#guard find 4 tree16 = node 4 (ctf 2) (node 8 (ctf 6) (node 16 (ctf 12) (ctf 24)))
+#guard find 12 tree16 = node 12 (node 8 (ctf 4) (ctf 10)) (node 16 (ctf 14) (ctf 24))
+#guard find 2 tree16 = node 2 (ctf 1) (node 16 (node 4 (ctf 3) (node 8 (ctf 6) (ctf 12))) (ctf 24))
+#guard find 2 tree16 = node 2 (ctf 1) (node 16 (node 4 (ctf 3) (node 8 (ctf 6) (ctf 12))) (ctf 24))
+#guard find 6 tree16 = node 6 (node 4 (ctf 2) (ctf 5)) (node 16 (node 8 (ctf 7) (ctf 12)) (ctf 24))
+#guard find 1 tree16 = node 1 nil (node 8 (node 2 nil (node 4 (ctf 3) (ctf 6))) (node 16 (ctf 12) (ctf 24)))
+#guard find 3 tree16 = node 3 (node 2 (ctf 1) nil) (node 8 (node 4 nil (ctf 6)) (node 16 (ctf 12) (ctf 24)))
+#guard find 15 tree16 = node 15 (node 8 (ctf 4) (node 14 (node 12 (ctf 10) (ctf 13)) nil)) (node 16 nil (ctf 24))
+#guard find 19 tree16 = node 19 (node 16 (ctf 8) (node 18 (ctf 17) nil)) (node 24 (node 20 nil (ctf 22)) (ctf 28))
 
 end demo

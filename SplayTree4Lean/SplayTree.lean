@@ -1,9 +1,11 @@
 import SplayTree4Lean.SplayMap
+set_option diagnostics true
 
 universe u
 variable {α : Type u} [LinearOrder α]
 
 def SplayTree (α : Type u) := SplayMap α Unit -- is this the best way?
+instance [DecidableEq α] : DecidableEq (SplayTree α) := inferInstanceAs (DecidableEq (SplayMap α Unit))
 
 namespace SplayTree
 
@@ -21,7 +23,7 @@ instance [ToString α] : ToString (SplayTree α) where
   toString := toStr ""
 
 #synth DecidableEq (SplayMap Nat Unit)
-#synth DecidableEq (SplayTree Nat) -- why does this not work?
+#synth DecidableEq (SplayTree Nat)
 
 def find : SplayTree α → α → SplayTree α :=
   SplayMap.find
@@ -43,14 +45,12 @@ end SplayTree
 section demo
 open SplayTree
 
-/-- Doesn't work, needs rewriting `splay`. -/
 def exampleTree1 : SplayTree Nat :=
   -- insert 10 (insert 20 (insert 30 (insert 25 (insert 5 (insert (15 : ℕ) nil)))))
   (((((nil.insert 15).insert 5).insert 25).insert 30).insert 20).insert 10
 
 def L : List Nat := [5, 3, 8, 1, 4, 7, 9]
 
-/-- Doesn't work, needs rewriting `splay`. -/
 def exampleTree2 : SplayTree Nat :=
   fromList L
 

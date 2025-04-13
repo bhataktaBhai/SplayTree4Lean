@@ -140,4 +140,11 @@ def toList : SplayMap α β → List (α × β)
   | nil => []
   | node xk xv xL xR => toList xL ++ [(xk, xv)] ++ toList xR
 
+def splayMem (a : α) : SplayMap α β → Prop
+  | .nil => False
+  | .node key _ left right => a = key ∨ splayMem a left ∨ splayMem a right
+
+instance : Membership α (SplayMap α β) where
+  mem a t := splayMem t a
+
 end SplayMap

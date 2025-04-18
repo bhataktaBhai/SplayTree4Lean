@@ -1,11 +1,12 @@
 import SplayTree4Lean.SplayMap
-set_option diagnostics true
 
 universe u
 variable {α : Type u} [LinearOrder α]
 
 def SplayTree (α : Type u) := SplayMap α Unit -- is this the best way?
-instance [DecidableEq α] : DecidableEq (SplayTree α) := inferInstanceAs (DecidableEq (SplayMap α Unit))
+
+instance [DecidableEq α] : DecidableEq (SplayTree α) :=
+  inferInstanceAs (DecidableEq (SplayMap α Unit))
 
 namespace SplayTree
 

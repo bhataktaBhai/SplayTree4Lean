@@ -13,6 +13,13 @@ inductive SplayMap (α : Type u) (β : Type v)
 
 namespace SplayMap
 
+def splayMem (x : α) : SplayMap α β → Prop
+  | .nil => False
+  | .node key _ left right => (x = key) ∨ (splayMem x left) ∨ (splayMem x right)
+
+instance : Membership α (SplayMap α β) where
+  mem a t := splayMem t a
+
 def toStr [ToString α] [ToString β] (header : String) : SplayMap α β → String
   | nil => header ++ "nil\n"
   | node yk yv yL yR => header ++ toString (yk, yv) ++ "\n" ++ toStr header' yL ++ toStr header' yR
@@ -92,19 +99,66 @@ def splayButOne (t : SplayMap α β) (x : α) : SplayMap α β :=
 Looks for a value `x` in a `SplayMap`.
 If found, splays the tree at that node.
 -/
-def splay (t : SplayMap α β) (x : α) : SplayMap α β :=
+def splay? (t : SplayMap α β) (x : α) : Option (SplayMap α β) :=
   let t := t.splayButOne x
   match t.locationOf x with
   | .root => t
   | .left => rotateLeftChild t
   | .right => rotateRightChild t
-  | .idk => t
+  | .idk => none -- `x` was not in `t`
 
-/-- Alias for `splay`. -/
-def find (t : SplayMap α β) (x : α) : SplayMap α β :=
-  t.splay x
+theorem splayMember (t : SplayMap α β) (x : α) (h : x ∈ t) :
+  (t.splay? x).isSome := sorry
 
-/-- Doesn't work, needs rewriting `splay`. -/
+/-- Return the last non-nil (key, value) pair on the search path to `x`. -/
+def search? (t : SplayMap α β) (x : α) : Option (α × β) :=
+  match t with
+  | nil => none
+  | node yk yv yL yR =>
+      if x = yk then
+        (yk, yv)
+      else if x < yk then
+        match search? yL x with
+        | none => (yk, yv)
+        | some (zk, zv) => some (zk, zv)
+      else
+        match search? yR x with
+        | none => (yk, yv)
+        | some (zk, zv) => some (zk, zv)
+      /- Alternative if easier to prove:
+      let k :=
+        if x = yk then
+          some x
+        else if x < yk then
+          search? yL x
+        else
+          search? yR x
+      if k matches none then yk else k
+      -/
+
+theorem searchMember (t : SplayMap α β) (x : α) (h : t ≠ nil) :
+  Option.isSome (t.search? x) ∧ ((t.search? x).1 ∈ t):= sorry
+
+/-- Alias for `splay?`. -/
+def get (t : SplayMap α β) (x : α) : SplayMap α β × Option β :=
+  let ykv? := t.search? x
+  match ykv? with
+  | none => (t, none) -- TODO: prove `t` is `nil`
+  | some (yk, yv) =>
+      let t := t.splay? yk
+      have t_isSome : t.isSome := sorry
+      let t :=  -- TODO: prove this is safe
+      have yk_mem : yk ∈ t := sorry
+      match t with
+      | nil => (nil, none) -- TODO: prove this does not happen
+      | node yk' yv' _ _ =>
+          if yk' = yk then (t, some yv')
+          else (t, none)
+  -- match yk with
+  -- | none => (t, none) -- means t is nil
+  -- | some yk => sorry
+
+/-- Doesn't work, needs rewriting `splay?`. -/
 def split (t : SplayMap α β) (x : α) : SplayMap α β × SplayMap α β :=
   let t := t.splay x
   match t with
@@ -120,7 +174,7 @@ def join (A B : SplayMap α β) : SplayMap α β :=
   | _, nil => A
   | node yk yv yL yR, _ => node yk yv yL (join yR B)
 
-/-- Doesn't work, needs rewriting `splay`. -/
+/-- Doesn't work, needs rewriting `splay?`. -/
 def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
   let (L, R) := t.split xk
   node xk xv L R
@@ -139,12 +193,5 @@ def fromList (L : List (α × β)) : SplayMap α β :=
 def toList : SplayMap α β → List (α × β)
   | nil => []
   | node xk xv xL xR => toList xL ++ [(xk, xv)] ++ toList xR
-
-def splayMem (a : α) : SplayMap α β → Prop
-  | .nil => False
-  | .node key _ left right => a = key ∨ splayMem a left ∨ splayMem a right
-
-instance : Membership α (SplayMap α β) where
-  mem a t := splayMem t a
 
 end SplayMap

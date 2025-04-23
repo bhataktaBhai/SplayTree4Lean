@@ -170,13 +170,12 @@ theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
       if h₁ : x = yk then
         subst h₁
         have h' : (node x yv yL yR).locationOf x = .root := by
-          simp_all! -- wtf?
+          simp_all!
         intro h''
         have p : Location.root ≠ Location.idk := by
           intro q
           trivial
-        -- aesop?
-        simp_all! -- ???
+        simp_all!
       else if x < yk then
         sorry
       else
@@ -240,8 +239,8 @@ def search? (t : SplayMap α β) (x : α) : Option (α × β) :=
       if k matches none then yk else k
       -/
 
-theorem searchMember (t : SplayMap α β) (x : α) (h : t ≠ nil) :
-  (t.search? x).isSome ∧ ((t.search? x).get!.1 ∈ t) := sorry
+-- theorem searchMember (t : SplayMap α β) (x : α) (h : t ≠ nil) :
+--   (t.search? x).isSome ∧ ((t.search? x).get!.1 ∈ t) := sorry
 
 /-- Alias for `splay?`. -/
 def get (t : SplayMap α β) (x : α) : SplayMap α β × Option β :=
@@ -263,31 +262,65 @@ def get (t : SplayMap α β) (x : α) : SplayMap α β × Option β :=
   -- | some yk => sorry
 
 /-- Doesn't work, needs rewriting `splay?`. -/
-def split (t : SplayMap α β) (x : α) : SplayMap α β × SplayMap α β :=
-  let t := t.splay x
-  match t with
-  | nil => (nil, nil)
+def split (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
+  let t' := t.splay x h
+  have h' : x ∈ t' := splay_preserves_membership t x h
+  match t' with
+  | nil => absurd h (by trivial)
   | node yk yv yL yR =>
-      if x < yk then (yL, node yk yv nil yR)
-      else if x > yk then (node yk yv yL nil, yR)
-      else (yL, yR)
+      if x ≤ yk then (yL, node yk yv nil yR)
+      else (node yk yv yL nil, yR)
 
+def max : (t : SplayMap α β) → (h : t ≠ nil) → α × β
+| nil, h => absurd h (by trivial)
+| node k v _ nil, _ => (k, v)
+| node _ _ _ r, _ => r.max (by sorry)
+
+/-- Joins two splay trees where all keys in A are less than all keys in B -/
 def join (A B : SplayMap α β) : SplayMap α β :=
   match A, B with
   | nil, _ => B
   | _, nil => A
-  | node yk yv yL yR, _ => node yk yv yL (join yR B)
+  | A, B =>
+      -- Find and splay the max element in A
+      let (maxK, maxV) := A.max (by sorry)
+      let A' := A.splay maxK (by sorry)
+      -- Now max element is at root of A'
+      match A' with
+      | node _ _ l _ => node maxK maxV l B
+      | nil => nil
 
 /-- Doesn't work, needs rewriting `splay?`. -/
 def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
-  let (L, R) := t.split xk
-  node xk xv L R
+  match t.search? xk with
+  | none =>
+    let (L, R) := t.split xk (by sorry)
+    node xk xv L R
+  | some _ =>
+    let t' := t.splay xk (by sorry)
+    match t' with
+    | node _ _ l r => node xk xv l r
+    | nil => nil
+
+theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
+    (t.max h) ∈ t := by sorry
 
 def delete (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
-  let t := t.splay x
-  match t with
-  | nil => nil
-  | node yk _ yL yR => if yk = x then join yL yR else t
+  let t' := t.splay x h  -- First splay the node to delete to the root
+  match t' with
+  | nil => absurd h (noMemNil x)
+  | node k _ l r =>
+    if x = k then
+      match l.max? with
+      | none => r
+      | some (maxK, maxV) =>
+          -- Splay the max of left subtree to root
+          let l' := l.splay maxK (by
+            simp [Membership.mem, splayMem]
+            exact l.max_mem (by sorry))
+          match l' with
+          | node _ _ ll lr => node maxK maxV ll r
+          | nil => nil
 
 /-- Builds a `SplayMap` from a `List` by inserting its elements one-by-one. -/
 def fromList (L : List (α × β)) : SplayMap α β :=

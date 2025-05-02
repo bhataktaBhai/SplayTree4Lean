@@ -13,9 +13,6 @@ inductive SplayMap (α : Type u) (β : Type v)
 
 namespace SplayMap
 
-instance : Inhabited (SplayMap α β) :=
-  ⟨nil⟩
-
 def toStr [ToString α] [ToString β] (header : String) : SplayMap α β → String
   | nil => header ++ "nil\n"
   | node yk yv yL yR => header ++ toString (yk, yv) ++ "\n" ++ toStr header' yL ++ toStr header' yR
@@ -36,38 +33,143 @@ instance instSplayMapMem : Membership α (SplayMap α β) :=
 
 omit [LinearOrder α] in
 lemma noMemNil : ∀ x, x ∉ (nil : SplayMap α β) := by
-  intro x
-  intro h; exact h
+  intro x h ; exact h
+
+/-- Returns the (key, val) pairs of the tree in order. -/
+def toList : SplayMap α β → List (α × β)
+  | nil => []
+  | node xk xv xL xR => toList xL ++ [(xk, xv)] ++ toList xR
+
+/-- Returns the keys of the tree in order. -/
+def keyList : SplayMap α β → List α
+  | nil => []
+  | node xk _ xL xR => keyList xL ++ [xk] ++ keyList xR
+
+omit [LinearOrder α] in
+theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, (x, y) ∈ t.toList := by
+  induction t with
+  | nil =>
+    apply Iff.intro
+    · intro a
+      simp_all only [instSplayMapMem, splayMem]
+    · simp_all!
+  | node yk yv yL yR ihL ihR =>
+    apply Iff.intro <;> intro h
+    · simp only at h
+      cases h with
+      | inl h' =>
+        subst h'
+        exact ⟨yv, by simp [toList]⟩
+      | inr h' =>
+        cases h' with
+        | inl h'' =>
+          have ⟨y, hy⟩ := ihL.mp h''
+          exact ⟨y, by simp [toList]; exact Or.inl hy⟩
+        | inr h'' =>
+          have ⟨y, hy⟩ := ihR.mp h''
+          exact ⟨y, by simp [toList]; exact Or.inr (Or.inr hy)⟩
+    · simp [toList] at h
+      have ⟨y, hy⟩ := h
+      match hy with
+      | Or.inl hL =>
+        exact Or.inr (Or.inl (ihL.mpr ⟨y, hL⟩))
+      | Or.inr (Or.inl hMid) =>
+        left; let ⟨hMid1, hMid2⟩ := hMid; exact hMid1
+      | Or.inr (Or.inr hR) =>
+        exact Or.inr (Or.inr (ihR.mpr ⟨y, hR⟩))
+
+omit [LinearOrder α] in
+theorem mem_iff_mem_key_list (x : α) (t : SplayMap α β): x ∈ t ↔ x ∈ t.keyList := by
+  induction t with
+  | nil =>
+    apply Iff.intro <;> simp_all!
+  | node yk yv yL yR ihL ihR =>
+    apply Iff.intro <;> intro h
+    · simp only at h
+      cases h with
+      | inl h' => simp_all!
+      | inr h' => cases h' <;> simp_all!
+    · simp [keyList] at h
+      cases h with
+      | inl h' => simp_all!
+      | inr h' =>
+        cases h' with
+        | inl h'' => simp_all!
+        | inr h'' => simp_all!
+
+def max? (t : SplayMap α β) : Option α :=
+  t.keyList.max?
+
+def max (t : SplayMap α β) (h : t ≠ nil) : α :=
+  match max? t with
+  | some k => k
+  | none   => by
+      cases t
+      · trivial
+      · rename_i key _ _ _
+        exact key
+
+def min? (t : SplayMap α β) : Option α :=
+  t.keyList.min?
+
+def min (t : SplayMap α β) (h : t ≠ nil) : α :=
+  match min? t with
+  | some k => k
+  | none   => by
+      cases t
+      · trivial
+      · rename_i key _ _ _
+        exact key
+
+def is_sorted : SplayMap α β → Prop
+ | nil => True
+ | node k _ left right =>
+   (match max? left with | some m => m ≤ k | none => True) ∧
+   (match min? right with | some m => k < m | none => True) ∧
+   is_sorted left ∧ is_sorted right
+
+def key (t : SplayMap α β) (h : t ≠ nil) : α :=
+  match t with
+  | nil => by trivial
+  | node key _ _ _ => key
+
+def val (t : SplayMap α β) (h : t ≠ nil) : β :=
+  match t with
+  | nil => by trivial
+  | node _ value _ _ => value
+
+def leftChild (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
+  match t with
+  | nil => by trivial
+  | node _ _ left _ => left
+
+def rightChild (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
+  match t with
+  | nil => by trivial
+  | node _ _ _ right => right
 
 /-- Rotates the edge joining the supplied node and its left child, if it exists. -/
-def rotateLeftChild : SplayMap α β → SplayMap α β
-  | node yk yv (node xk xv xL xR) yR => node xk xv xL (node yk yv xR yR)
-  | t => t
+def rotateLeftChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.leftChild h1 ≠ nil) : SplayMap α β :=
+ (node ((t.leftChild h1).key h2) ((t.leftChild h1).val h2) ((t.leftChild h1).leftChild h2) (node (t.key h1) (t.val h1) ((t.leftChild h1).rightChild h2) (t.rightChild h1)))
 
 /-- Rotates the edge joining the supplied node and its right child, if it exists. -/
-def rotateRightChild : SplayMap α β → SplayMap α β
-  | node yk yv yL (node xk xv xL xR) => node xk xv (node yk yv yL xL) xR
-  | t => t
+def rotateRightChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.rightChild h1 ≠ nil) : SplayMap α β :=
+ (node ((t.rightChild h1).key h2) ((t.rightChild h1).val h2) (node (t.key h1) (t.val h1) (t.leftChild h1) ((t.rightChild h1).leftChild h2)) ((t.rightChild h1).rightChild h2))
 
-omit [LinearOrder α] in
-lemma rotateLeftPreservesMem : ∀ t : SplayMap α β, ∀ x, x ∈ t → x ∈ t.rotateLeftChild := by
-  intro t x h
-  unfold rotateLeftChild
-  split
-  · simp only [splayMem, instSplayMapMem] at h
-    cases h with
-    | inl h1 =>
-        subst h1
-        simp
-    | inr h1 =>
-        aesop
-  · exact h
-
-omit [LinearOrder α] in
-lemma rotateRightPreservesMem : ∀ t : SplayMap α β, ∀ x, x ∈ t → x ∈ t.rotateRightChild := by
-  intro t x h
-  unfold rotateRightChild
-  aesop
+-- theorem le_max_of_mem (t : SplayMap α β) (h : t ≠ nil) (x : α) (hx : x ∈ t) :
+--   x ≤ max t h := by
+--   have h' : t.keyList ≠ [] := by
+--     simp_all only [ne_eq, bne_iff_ne, mem_iff_mem_key_list, splayMem]
+--     intro a
+--     simp_all only [List.not_mem_nil]
+--   unfold max
+--   generalize hmax : max? t = o
+--   cases o with
+--   | none =>
+--     dsimp [max?] at h'
+--     have h_empty : t.keyList = [] := List.max?_eq_none_iff.mp hmax
+--     contradiction
+--   | some k' =>
 
 /- I was trying...
   intro t x h
@@ -94,27 +196,27 @@ the `right` child of the root, or `idk` because I do not know what to name this
 case.
 -/
 inductive Location
-  | root | left | right | idk
+  | root | left | right
 
 /-- Returns the `Location` of the supplied value in the supplied tree. -/
-def locationOf (t : SplayMap α β) (x : α) : Location :=
+def locationOf (t : SplayMap α β) (x : α) : Option (Location) :=
   match t with
-  | nil => .idk
+  | nil => none
   | node yk _ yL yR =>
     if x = yk then
-      .root
+      Location.root
     else if x < yk then
       match yL with
-      | nil => .idk
+      | nil => none
       | node ylk _ _ _ =>
-          if x = ylk then .left
-          else .idk
+          if x = ylk then Location.left
+          else none
     else
       match yR with
-      | nil => .idk
+      | nil => none
       | node yrk _ _ _ =>
-          if x = yrk then .right
-          else .idk
+          if x = yrk then Location.right
+          else none
 
 def atRoot (t : SplayMap α β) (x : α) : Prop :=
   match t with
@@ -146,40 +248,62 @@ def splayButOne (t : SplayMap α β) (x : α) : SplayMap α β :=
       if x = yk then
         t
       else if x < yk then
-        let yL := yL.splayButOne x
-        match yL.locationOf x with
-        | .root => node yk yv yL yR
-        | .left => node yk yv yL yR |> rotateLeftChild |> rotateLeftChild -- zig-zig
-        | .right => node yk yv (rotateRightChild yL) yR |> rotateLeftChild -- zig-zag
-        | .idk => node yk yv yL yR
+        let yL' := yL.splayButOne x
+        match yL'.locationOf x with
+        | Location.root => node yk yv yL' yR
+        | Location.left =>
+          match rotateLeftChild (node yk yv yL' yR) with
+          | some t1 =>
+            match rotateLeftChild t1 with
+            | some t2 => t2
+            | none => t1
+          | none => node yk yv yL' yR
+        | Location.right =>
+          match rotateRightChild yL' with
+          | some newYl =>
+            match rotateLeftChild (node yk yv newYl yR) with
+            | some t' => t'
+            | none => node yk yv newYl yR
+          | none => node yk yv yL' yR
       else
-        let yR := yR.splayButOne x
-        match yR.locationOf x with
-        | .root => node yk yv yL yR
-        | .right => node yk yv yL yR |> rotateRightChild |> rotateRightChild -- zig-zig
-        | .left => node yk yv yL (rotateLeftChild yR) |> rotateRightChild -- zig-zag
-        | .idk => node yk yv yL yR
+        let yR' := yR.splayButOne x
+        match yR'.locationOf x with
+        | Location.root => node yk yv yL yR'
+        | Location.right =>
+          match rotateRightChild (node yk yv yL yR') with
+          | some t1 =>
+            match rotateRightChild t1 with
+            | some t2 => t2
+            | none => t1
+          | none => node yk yv yL yR'
+        | Location.left =>
+          match rotateLeftChild yR' with
+          | some newYr =>
+            match rotateRightChild (node yk yv yL newYr) with
+            | some t' => t'
+            | none => node yk yv yL newYr
+          | none => node yk yv yL yR'
 
-theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
-    (t.splayButOne x).locationOf x ≠ .idk := by
-  cases t with
-  | nil =>
-      absurd h
-      exact noMemNil x
-  | node yk yv yL yR =>
-      if h₁ : x = yk then
-        subst h₁
-        have h' : (node x yv yL yR).locationOf x = .root := by
-          simp_all!
-        intro h''
-        have p : Location.root ≠ Location.idk := by
-          intro q
-          trivial
-        simp_all!
-      else if x < yk then
-        sorry
-      else
-        sorry
+-- theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
+--     (t.splayButOne x).locationOf x ≠ .idk := by
+--   cases t with
+--   | nil =>
+--       absurd h
+--       exact noMemNil x
+--   | node yk yv yL yR =>
+--       if h₁ : x = yk then
+--         subst h₁
+--         have h' : (node x yv yL yR).locationOf x = .root := by
+--           simp_all!
+--         intro h''
+--         have p : Location.root ≠ Location.idk := by
+--           intro q
+--           trivial
+--         simp_all!
+--       else if x < yk then
+--         sorry
+--       else
+--         sorry
 
 /-
 Looks for a value `x` in a `SplayMap`.
@@ -271,11 +395,6 @@ def split (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β × SplayM
       if x ≤ yk then (yL, node yk yv nil yR)
       else (node yk yv yL nil, yR)
 
-def max : (t : SplayMap α β) → (h : t ≠ nil) → α × β
-| nil, h => absurd h (by trivial)
-| node k v _ nil, _ => (k, v)
-| node _ _ _ r, _ => r.max (by sorry)
-
 /-- Joins two splay trees where all keys in A are less than all keys in B -/
 def join (A B : SplayMap α β) : SplayMap α β :=
   match A, B with
@@ -303,35 +422,69 @@ def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
     | nil => nil
 
 theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
-    (t.max h) ∈ t := by sorry
+    (t.max h).1 ∈ t := by sorry
 
 def delete (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
   let t' := t.splay x h  -- First splay the node to delete to the root
+  have h' : x ∈ t' := splay_preserves_membership t x h
   match t' with
-  | nil => absurd h (noMemNil x)
-  | node k _ l r =>
+  | nil => absurd h' (noMemNil x)
+  | node k v l r =>
     if x = k then
-      match l.max? with
-      | none => r
-      | some (maxK, maxV) =>
-          -- Splay the max of left subtree to root
-          let l' := l.splay maxK (by
-            simp [Membership.mem, splayMem]
-            exact l.max_mem (by sorry))
-          match l' with
-          | node _ _ ll lr => node maxK maxV ll r
-          | nil => nil
+      let (maxK, maxV) := l.max (by sorry)
+      let l' := l.splay maxK (by
+        simp [Membership.mem, splayMem]
+        apply l.max_mem (by sorry))
+      match l' with
+        | node _ _ ll lr => node maxK maxV ll r
+        | nil => nil
+      -- match l.max? with
+      -- | none => r
+      -- | some (maxK, maxV) =>
+      --     -- Splay the max of left subtree to root
+      --     let l' := l.splay maxK (by
+      --       simp [Membership.mem, splayMem]
+      --       exact l.max_mem (by sorry))
+      --     match l' with
+      --     | node _ _ ll lr => node maxK maxV ll r
+      --     | nil => nil
+    else
+      -- Prove contradiction
+      sorry
 
 /-- Builds a `SplayMap` from a `List` by inserting its elements one-by-one. -/
 def fromList (L : List (α × β)) : SplayMap α β :=
   L.foldl (fun t (xk, xv) => t.insert xk xv) nil
 
-/-- Returns the elements of the tree in order. -/
-def toList : SplayMap α β → List (α × β)
-  | nil => []
-  | node xk xv xL xR => toList xL ++ [(xk, xv)] ++ toList xR
-
 end SplayMap
+
+def SortedMap (α : Type u) (β : Type v) [LinearOrder α] :=
+  {t : SplayMap α β // SplayMap.is_sorted t}
+
+namespace SortedMap
+open SplayMap
+
+def nil : SortedMap α β :=
+  ⟨SplayMap.nil, True.intro⟩
+
+def leftChild (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
+  let t' := (t.val).leftChild h
+  have h' : is_sorted t' := by
+    let ⟨t, h⟩ := t
+
+  ⟨t', h'⟩
+
+def rotateLeftChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).leftChild h1 ≠ SplayMap.nil) : SortedMap α β :=
+  let t' := (t.val).rotateLeftChild h1 h2
+  have h' : SplayMap.is_sorted t' := by
+  ⟨t', h'⟩
+
+def rotateRightChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).rightChild h1 ≠ SplayMap.nil) : SortedMap α β :=
+  let t' := (t.val).rotateRightChild h1 h2
+  have h' : SplayMap.is_sorted t' := by sorry
+⟨t', h'⟩
+
+end SortedMap
 
 def five? : Option Nat := Option.some 5
 #check five?

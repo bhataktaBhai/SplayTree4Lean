@@ -97,116 +97,99 @@ theorem mem_iff_mem_key_list (x : α) (t : SplayMap α β): x ∈ t ↔ x ∈ t.
         | inl h'' => simp_all!
         | inr h'' => simp_all!
 
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma key_list_empty_iff : ∀ t : SplayMap α β, t.keyList = [] ↔ t = nil
+  | nil => by
+    simp [keyList]
+  | node key _ left right => by
+    simp [keyList]
+
 def max? (t : SplayMap α β) : Option α :=
   t.keyList.max?
-
-def max (t : SplayMap α β) (h : t ≠ nil) : α :=
-  match max? t with
-  | some k => k
-  | none   => by
-      cases t
-      · trivial
-      · rename_i key _ _ _
-        exact key
 
 def min? (t : SplayMap α β) : Option α :=
   t.keyList.min?
 
-def min (t : SplayMap α β) (h : t ≠ nil) : α :=
-  match min? t with
+def max (t : SplayMap α β) (h : t ≠ nil) : α :=
+  match h' : max? t with
   | some k => k
   | none   => by
-      cases t
-      · trivial
-      · rename_i key _ _ _
-        exact key
+    have h_empty : t.keyList = [] := List.max?_eq_none_iff.mp h'
+    have h_nil : t = nil := (key_list_empty_iff t).mp h_empty
+    contradiction
+
+def min (t : SplayMap α β) (h : t ≠ nil) : α :=
+  match h' : min? t with
+  | some k => k
+  | none   => by
+    have h_empty : t.keyList = [] := List.min?_eq_none_iff.mp h'
+    have h_nil : t = nil := (key_list_empty_iff t).mp h_empty
+    contradiction
 
 def is_sorted : SplayMap α β → Prop
   | nil => True
   | node k _ left right =>
-      (match max? left with | some m => m ≤ k | none => True) ∧
-      (match min? right with | some m => k < m | none => True) ∧
-      is_sorted left ∧ is_sorted right
+      (match max? left with | some m => m ≤ k | none => True)
+      ∧ (match min? right with | some m => k < m | none => True)
+      ∧ is_sorted left
+      ∧ is_sorted right
 
-def key (t : SplayMap α β) (h : t ≠ nil) : α :=
-  match t with
-  | nil => by trivial
-  | node key _ _ _ => key
+def key (t : SplayMap α β) (h : t ≠ nil) : α := match t with
+  | node key _ _ _ => key -- how is Lean so smart?!
 
-def val (t : SplayMap α β) (h : t ≠ nil) : β :=
-  match t with
-  | nil => by trivial
+def value (t : SplayMap α β) (h : t ≠ nil) : β := match t with
   | node _ value _ _ => value
 
-def left (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
-  match t with
-  | nil => by trivial
+def left (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
   | node _ _ left _ => left
 
-def right (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
-  match t with
-  | nil => by trivial
+def right (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
   | node _ _ _ right => right
-
-lemma temp (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) :
-    t matches node yk yv (node ylk ylv yLL yLR) yR := sorry
 
 /-- Rotates the edge joining the supplied node and its left child, if it exists. -/
 def rotateLeftChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) : SplayMap α β :=
- (node ((t.left h1).key h2) ((t.left h1).val h2) ((t.left h1).left h2) (node (t.key h1) (t.val h1) ((t.left h1).right h2) (t.right h1)))
+  match t with
+  | node yk yv (node ylk ylv yLL yLR) yR =>
+    node ylk ylv yLL (node yk yv yLR yR) -- how is Lean so smart?!
 
 /-- Rotates the edge joining the supplied node and its right child, if it exists. -/
 def rotateRightChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.right h1 ≠ nil) : SplayMap α β :=
- (node ((t.right h1).key h2) ((t.right h1).val h2) (node (t.key h1) (t.val h1) (t.left h1) ((t.right h1).left h2)) ((t.right h1).right h2))
+  match t with
+  | node yk yv yL (node yrk yrV yRL yRR) =>
+    node yrk yrV (node yk yv yL yRL) yRR
 
 omit [DecidableEq α] [DecidableEq β] in
 theorem sorted_implies_left_sorted (t : SplayMap α β) (h : t ≠ nil) :
-  t.is_sorted → (t.leftChild h).is_sorted := by
-  intro h'
-  cases t with
-  | nil => trivial
-  | node yk yv yL yR =>
-    have h'' : yL.is_sorted := h'.2.2.1
-    have h''' : (node yk yv yL yR).leftChild h = yL := rfl
-    exact h''
+    t.is_sorted → (t.left h).is_sorted :=
+  match ht : t with
+  | node yk yv yL yR => by
+    intro h'
+    exact h'.2.2.1
 
 omit [DecidableEq α] [DecidableEq β] in
 theorem sorted_implies_right_sorted (t : SplayMap α β) (h : t ≠ nil) :
-  t.is_sorted → (t.rightChild h).is_sorted := by
-  intro h'
-  cases t with
-  | nil => trivial
-  | node yk yv yL yR =>
-    have h'' : yR.is_sorted := h'.2.2.2
-    have h''' : (node yk yv yL yR).rightChild h = yR := rfl
-    exact h''
+    t.is_sorted → (t.right h).is_sorted :=
+  match t with
+  | node yk yv yL yR => by
+    intro h'
+    exact h'.2.2.2
 
 def size : SplayMap α β → Nat
   | SplayMap.nil => 0
   | SplayMap.node _ _ l r => 1 + l.size + r.size
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma size_mono_left (t : SplayMap α β) (h : t ≠ nil) :
-  t.size > (t.leftChild h).size  := by
-  cases t with
-  | nil => contradiction
-  | node k v l r =>
-    have h1 : (node k v l r).size = 1 + l.size + r.size := rfl
-    rw [h1]
-    have h2 : (node k v l r).leftChild h = l := rfl
-    rw [h2]
+lemma size_mono_left (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.left h).size :=
+  match ht : t with
+  | node k v l r => by
+    rw [size, left]
     omega
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) :
-  t.size > (t.rightChild h).size  := by
-  cases t with
-  | nil => contradiction
-  | node k v l r =>
-    have h1 : (node k v l r).size = 1 + l.size + r.size := rfl
-    rw [h1]
-    have h2 : (node k v l r).rightChild h = r := rfl
-    rw [h2]
+lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.right h).size :=
+  match t with
+  | node k v l r => by
+    rw [size, right]
     omega
 
 -- theorem le_max_of_mem (t : SplayMap α β) (h : t ≠ nil) (x : α) (hx : x ∈ t) :
@@ -244,14 +227,15 @@ lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) :
 
 /--
 Inductive type to keep track of where a particular value is present in a tree,
-in the first two levels: at the `root`, the `left` child of the root,
-the `right` child of the root, or `idk` because I do not know what to name this
-case.
+in the first two levels: at the `root`, at the `left` child of the root,
+or at the `right` child of the root.
+The `locationOf` function defined below returns `none` if it is at none of these.
 -/
 inductive Location
   | root | left | right
 
-/-- Returns the `Location` of the supplied value in the supplied tree. -/
+/-- Returns the `Location` of the supplied value in the supplied tree.
+Returns `none` if it is not in the first two levels of the tree. -/
 def locationOf (t : SplayMap α β) (x : α) : Option Location :=
   match t with
   | nil => none
@@ -286,6 +270,8 @@ def atRight (t : SplayMap α β) (x : α) : Prop :=
   | node _ _ _ (node yrk _ _ _) => x = yrk
   | _ => False
 
+-- TODO: do we use the three above functions anywhere? should we use them in `locationOf`?
+
 /--
 Looks for a value `x` in a `SplayMap`.
 If found, splays the tree at that node, executing zig-zig and zig-zag steps
@@ -318,6 +304,7 @@ def splayButOne (t : SplayMap α β) (x : α) : SplayMap α β :=
             | some t' => t'
             | none => node yk yv newYl yR
           | none => node yk yv yL' yR
+        | none => sorry
       else
         let yR' := yR.splayButOne x
         match yR'.locationOf x with
@@ -524,62 +511,196 @@ def nil : SortedMap α β :=
   ⟨SplayMap.nil, trivial⟩
 
 omit [DecidableEq α] [DecidableEq β] in
-theorem sorted_nil_iff_splay_nil (t : SortedMap α β) :
-    t = nil ↔ t.val = SplayMap.nil := by
+theorem sorted_nil_iff (t : SortedMap α β) : t = nil ↔ t.val = .nil := by
   apply Iff.intro <;> intro h
-  · subst h; rfl
+  · subst h
+    rfl
   · apply Subtype.eq
-    simpa only
+    assumption
 
-<<<<<<< Updated upstream
-def leftChild (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
-  ⟨t.val.leftChild h, sorted_implies_left_sorted t.val h t.prop⟩
-=======
-def left (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
-  let t' := (t.val).left h
-  have h' : is_sorted t' := by
-    let ⟨t, h⟩ := t
->>>>>>> Stashed changes
+#eval 2 + 3
 
-def rightChild (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
-  ⟨t.val.rightChild h, sorted_implies_right_sorted t.val h t.prop⟩
+omit [DecidableEq α] [DecidableEq β] in
+@[simp]
+theorem sorted_not_nil_implies (t : SortedMap α β) : t ≠ nil → t.val ≠ .nil := by
+  simp [sorted_nil_iff]
+
+def key (t : SortedMap α β) (h : t ≠ .nil) : α :=
+  t.val.key (by simp [h])
+
+def value (t : SortedMap α β) (h : t ≠ nil) : β :=
+  t.val.value (by simp [h])
+
+def left (t : SortedMap α β) (h : t ≠ nil) : SortedMap α β :=
+  ⟨t.val.left h', sorted_implies_left_sorted t.val h' t.prop⟩
+    where h' : t.val ≠ .nil := by simp [h]
+
+def right (t : SortedMap α β) (h : t ≠ nil) : SortedMap α β :=
+  ⟨t.val.right h', sorted_implies_right_sorted t.val h' t.prop⟩
+    where h' : t.val ≠ .nil := by simp [h]
 
 def max (t : SortedMap α β) (h : t ≠ nil) : α :=
-  have h0 : t.val ≠ SplayMap.nil := by
-    simp_all only [ne_eq, sorted_nil_iff_splay_nil, not_false_eq_true]
-  if h' : (t.rightChild h0) = nil then
+  have h0 : t.val ≠ SplayMap.nil := by simp [h]
+  if h' : t.right h = nil then
     t.val.key h0
   else
-    (t.rightChild h0).max h'
+    (t.right h).max h'
 termination_by t.val.size
 decreasing_by (exact size_mono_right t.val h0)
 
 def min (t : SortedMap α β) (h : t ≠ nil) : α :=
-  have h0 : t.val ≠ SplayMap.nil := by
-    simp_all only [ne_eq, sorted_nil_iff_splay_nil, not_false_eq_true]
-  if h' : (t.leftChild h0) = nil then
+  have h0 : t.val ≠ SplayMap.nil := by simp [h]
+  if h' : (t.left h) = nil then
     t.val.key h0
   else
-    (t.leftChild h0).min h'
+    (t.left h).min h'
 termination_by t.val.size
 decreasing_by (exact size_mono_left t.val h0)
 
-def rotateLeftChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).left h1 ≠ SplayMap.nil) : SortedMap α β :=
-  let t' := (t.val).rotateLeftChild h1 h2
-  have h' : t'.is_sorted := by
-    cases t.val with
-    | nil => simp [h1]
-    | node _ _ l r =>
-      have h'' : l.is_sorted := sorted_implies_left_sorted t.val h1 t.prop
-      have h''' : (node (t.val).key (t.val).val l r).leftChild h1 = l := rfl
-      exact h''
-    sorry
+theorem plus_one (n : ℕ) : n + 1 > n := by
+  induction n with
+  | zero => trivial
+  | succ n => simp
+
+def rotateLeftChild (t : SortedMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) : SortedMap α β :=
+  -- let t' := match t.val with
+  -- | node yk yv (node ylk ylv yLL yLR) yR =>
+  --   node ylk ylv yLL (node yk yv yLR yR) -- how is Lean so smart?!
+  -- | node yk yv .nil yR => sorry
+  -- | .nil => sorry
+  have ht : t.val ≠ .nil := by simp [h1]
+  have htl : t.val.left ht ≠ .nil := by sorry
+  let t' := SplayMap.rotateLeftChild t.val ht htl
+  have h' : (SplayMap.rotateLeftChild t.val ht htl).is_sorted := by
+    induction t.val with
+    | nil => 
+      have hh : t.val = .nil := by simp_all!
+      sorry
+    | node yk yv yL yR ihL ihR => sorry
+    match h : t.val with
+    | .nil =>
+      contradiction
+    | node yk yv .nil yR =>
+      have htl' : t.val.left ht = .nil := by simp_all! only
+      contradiction
+    | node yk yv (node ylk ylv yLL yLR) yR =>
+      simp_all [SplayMap.rotateLeftChild, t', ht]
+      match t.val, ht, htl with
+      | node yk yv (node ylk ylv yLL yLR) yR, h1, h2 =>
+        simp only
+      -- unfold SplayMap.is_sorted
+      match t' with
+      | .nil => trivial
+      | node _ _ l r => simp only
+      have hl : (t.1.left h).is_sorted := sorted_implies_left_sorted t.1 h t.2
+      have htl : t.1.left h = l := by
+        simp [ht]
+        rw [SplayMap.left]
+      have hl' : l.is_sorted := by simp_all
+      have hr : (t.1.right h).is_sorted := sorted_implies_right_sorted t.1 h t.2
+      have htr : t.1.right h = r := by
+        simp [ht]
+        rw [SplayMap.right]
+      have hr' : r.is_sorted := by simp_all
+
+      -- unfold SplayMap.is_sorted
+      -- match t' with
+      -- | .nil => trivial
+      -- | .node _ _ _ _ =>
+      -- exact h''
   ⟨t', h'⟩
 
 def rotateRightChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).right h1 ≠ SplayMap.nil) : SortedMap α β :=
   let t' := (t.val).rotateRightChild h1 h2
   have h' : t'.is_sorted := by sorry
   ⟨t', h'⟩
+
+/--
+Looks for a value `x` in a `SplayMap`.
+If found, splays the tree at that node, executing zig-zig and zig-zag steps
+but *not* a zig step.
+That is, if `x` ends up as a child of the root, a final rotation to bring it to
+the root is *not* performed.
+This is necessary for recursion to work in the `splay` function.
+-/
+def splayButOne (t : SortedMap α β) (x : α) : SortedMap α β :=
+  match t.val with
+  | .nil => nil
+  | .node yk yv yL yR =>
+      if x = yk then
+        t
+      else if x < yk then
+        let yL' := yL.splayButOne x
+        match yL'.locationOf x with
+        | Location.root => ⟨.node yk yv yL' yR, sorry⟩
+        | Location.left =>
+          match (node yk yv yL' yR).rotateLeftChild (sorry) with
+          | t1 =>
+            match rotateLeftChild t1 with
+            | some t2 => t2
+            | none => t1
+          | none => node yk yv yL' yR
+        | Location.right =>
+          match rotateRightChild yL' with
+          | some newYl =>
+            match rotateLeftChild (node yk yv newYl yR) with
+            | some t' => t'
+            | none => node yk yv newYl yR
+          | none => node yk yv yL' yR
+        | none => sorry
+      else
+        let yR' := yR.splayButOne x
+        match yR'.locationOf x with
+        | Location.root => node yk yv yL yR'
+        | Location.right =>
+          match rotateRightChild (node yk yv yL yR') with
+          | some t1 =>
+            match rotateRightChild t1 with
+            | some t2 => t2
+            | none => t1
+          | none => node yk yv yL yR'
+        | Location.left =>
+          match rotateLeftChild yR' with
+          | some newYr =>
+            match rotateRightChild (node yk yv yL newYr) with
+            | some t' => t'
+            | none => node yk yv yL newYr
+          | none => node yk yv yL yR'
+
+-- theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
+--     (t.splayButOne x).locationOf x ≠ .idk := by
+--   cases t with
+--   | nil =>
+--       absurd h
+--       exact noMemNil x
+--   | node yk yv yL yR =>
+--       if h₁ : x = yk then
+--         subst h₁
+--         have h' : (node x yv yL yR).locationOf x = .root := by
+--           simp_all!
+--         intro h''
+--         have p : Location.root ≠ Location.idk := by
+--           intro q
+--           trivial
+--         simp_all!
+--       else if x < yk then
+--         sorry
+--       else
+--         sorry
+
+/-
+Looks for a value `x` in a `SplayMap`.
+If found, splays the tree at that node.
+-/
+def splay (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
+  let t' := t.splayButOne x
+  let loc := t'.locationOf x
+  have h' : loc ≠ .idk := splayButOneMemberLocation t x h
+  match loc with
+  | .root => t
+  | .left => rotateLeftChild t
+  | .right => rotateRightChild t
+  | .idk => by trivial
 
 end SortedMap
 

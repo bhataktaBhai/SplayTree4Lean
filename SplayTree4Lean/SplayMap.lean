@@ -3,13 +3,13 @@ import Mathlib.Data.Nat.Basic -- for LinearOrder Nat
 import Mathlib.Data.Nat.MaxPowDiv -- for maxPowDiv
 
 universe u v
-variable {α : Type u} [LinearOrder α]
-variable {β : Type v}
+variable {α : Type u} [LinearOrder α] [DecidableEq α]
+variable {β : Type v} [DecidableEq β]
 
 inductive SplayMap (α : Type u) (β : Type v)
   | nil : SplayMap α β
   | node (key : α) (val : β) (left right : SplayMap α β) : SplayMap α β
-  deriving DecidableEq, BEq
+  deriving DecidableEq
 
 namespace SplayMap
 
@@ -31,7 +31,7 @@ def splayMem (t : SplayMap α β) (x : α) : Prop :=
 instance instSplayMapMem : Membership α (SplayMap α β) :=
   ⟨splayMem⟩
 
-omit [LinearOrder α] in
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 lemma noMemNil : ∀ x, x ∉ (nil : SplayMap α β) := by
   intro x h ; exact h
 
@@ -45,7 +45,7 @@ def keyList : SplayMap α β → List α
   | nil => []
   | node xk _ xL xR => keyList xL ++ [xk] ++ keyList xR
 
-omit [LinearOrder α] in
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, (x, y) ∈ t.toList := by
   induction t with
   | nil =>
@@ -78,7 +78,7 @@ theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, 
       | Or.inr (Or.inr hR) =>
         exact Or.inr (Or.inr (ihR.mpr ⟨y, hR⟩))
 
-omit [LinearOrder α] in
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 theorem mem_iff_mem_key_list (x : α) (t : SplayMap α β): x ∈ t ↔ x ∈ t.keyList := by
   induction t with
   | nil =>
@@ -122,11 +122,11 @@ def min (t : SplayMap α β) (h : t ≠ nil) : α :=
         exact key
 
 def is_sorted : SplayMap α β → Prop
- | nil => True
- | node k _ left right =>
-   (match max? left with | some m => m ≤ k | none => True) ∧
-   (match min? right with | some m => k < m | none => True) ∧
-   is_sorted left ∧ is_sorted right
+  | nil => True
+  | node k _ left right =>
+      (match max? left with | some m => m ≤ k | none => True) ∧
+      (match min? right with | some m => k < m | none => True) ∧
+      is_sorted left ∧ is_sorted right
 
 def key (t : SplayMap α β) (h : t ≠ nil) : α :=
   match t with
@@ -155,6 +155,56 @@ def rotateLeftChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.leftChild h1 �
 /-- Rotates the edge joining the supplied node and its right child, if it exists. -/
 def rotateRightChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.rightChild h1 ≠ nil) : SplayMap α β :=
  (node ((t.rightChild h1).key h2) ((t.rightChild h1).val h2) (node (t.key h1) (t.val h1) (t.leftChild h1) ((t.rightChild h1).leftChild h2)) ((t.rightChild h1).rightChild h2))
+
+omit [DecidableEq α] [DecidableEq β] in
+theorem sorted_implies_left_sorted (t : SplayMap α β) (h : t ≠ nil) :
+  t.is_sorted → (t.leftChild h).is_sorted := by
+  intro h'
+  cases t with
+  | nil => trivial
+  | node yk yv yL yR =>
+    have h'' : yL.is_sorted := h'.2.2.1
+    have h''' : (node yk yv yL yR).leftChild h = yL := rfl
+    exact h''
+
+omit [DecidableEq α] [DecidableEq β] in
+theorem sorted_implies_right_sorted (t : SplayMap α β) (h : t ≠ nil) :
+  t.is_sorted → (t.rightChild h).is_sorted := by
+  intro h'
+  cases t with
+  | nil => trivial
+  | node yk yv yL yR =>
+    have h'' : yR.is_sorted := h'.2.2.2
+    have h''' : (node yk yv yL yR).rightChild h = yR := rfl
+    exact h''
+
+def size : SplayMap α β → Nat
+  | SplayMap.nil => 0
+  | SplayMap.node _ _ l r => 1 + l.size + r.size
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma size_mono_left (t : SplayMap α β) (h : t ≠ nil) :
+  t.size > (t.leftChild h).size  := by
+  cases t with
+  | nil => contradiction
+  | node k v l r =>
+    have h1 : (node k v l r).size = 1 + l.size + r.size := rfl
+    rw [h1]
+    have h2 : (node k v l r).leftChild h = l := rfl
+    rw [h2]
+    omega
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) :
+  t.size > (t.rightChild h).size  := by
+  cases t with
+  | nil => contradiction
+  | node k v l r =>
+    have h1 : (node k v l r).size = 1 + l.size + r.size := rfl
+    rw [h1]
+    have h2 : (node k v l r).rightChild h = r := rfl
+    rw [h2]
+    omega
 
 -- theorem le_max_of_mem (t : SplayMap α β) (h : t ≠ nil) (x : α) (hx : x ∈ t) :
 --   x ≤ max t h := by
@@ -459,30 +509,67 @@ def fromList (L : List (α × β)) : SplayMap α β :=
 end SplayMap
 
 def SortedMap (α : Type u) (β : Type v) [LinearOrder α] :=
-  {t : SplayMap α β // SplayMap.is_sorted t}
+  { t : SplayMap α β // SplayMap.is_sorted t }
+
+instance [DecidableEq (SplayMap α β)]: DecidableEq (SortedMap α β) :=
+  fun s t => if h : s.val = t.val then isTrue (Subtype.eq h) else isFalse (fun p => by cases p; contradiction)
 
 namespace SortedMap
 open SplayMap
 
 def nil : SortedMap α β :=
-  ⟨SplayMap.nil, True.intro⟩
+  ⟨SplayMap.nil, trivial⟩
+
+omit [DecidableEq α] [DecidableEq β] in
+theorem sorted_nil_iff_splay_nil (t : SortedMap α β) :
+    t = nil ↔ t.val = SplayMap.nil := by
+  apply Iff.intro <;> intro h
+  · subst h; rfl
+  · apply Subtype.eq
+    simpa only
 
 def leftChild (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
-  let t' := (t.val).leftChild h
-  have h' : is_sorted t' := by
-    let ⟨t, h⟩ := t
+  ⟨t.val.leftChild h, sorted_implies_left_sorted t.val h t.prop⟩
 
-  ⟨t', h'⟩
+def rightChild (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
+  ⟨t.val.rightChild h, sorted_implies_right_sorted t.val h t.prop⟩
+
+def max (t : SortedMap α β) (h : t ≠ nil) : α :=
+  have h0 : t.val ≠ SplayMap.nil := by
+    simp_all only [ne_eq, sorted_nil_iff_splay_nil, not_false_eq_true]
+  if h' : (t.rightChild h0) = nil then
+    t.val.key h0
+  else
+    (t.rightChild h0).max h'
+termination_by t.val.size
+decreasing_by (exact size_mono_right t.val h0)
+
+def min (t : SortedMap α β) (h : t ≠ nil) : α :=
+  have h0 : t.val ≠ SplayMap.nil := by
+    simp_all only [ne_eq, sorted_nil_iff_splay_nil, not_false_eq_true]
+  if h' : (t.leftChild h0) = nil then
+    t.val.key h0
+  else
+    (t.leftChild h0).min h'
+termination_by t.val.size
+decreasing_by (exact size_mono_left t.val h0)
 
 def rotateLeftChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).leftChild h1 ≠ SplayMap.nil) : SortedMap α β :=
   let t' := (t.val).rotateLeftChild h1 h2
-  have h' : SplayMap.is_sorted t' := by
+  have h' : t'.is_sorted := by
+    cases t.val with
+    | nil => simp [h1]
+    | node _ _ l r =>
+      have h'' : l.is_sorted := sorted_implies_left_sorted t.val h1 t.prop
+      have h''' : (node (t.val).key (t.val).val l r).leftChild h1 = l := rfl
+      exact h''
+    sorry
   ⟨t', h'⟩
 
 def rotateRightChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).rightChild h1 ≠ SplayMap.nil) : SortedMap α β :=
   let t' := (t.val).rotateRightChild h1 h2
-  have h' : SplayMap.is_sorted t' := by sorry
-⟨t', h'⟩
+  have h' : t'.is_sorted := by sorry
+  ⟨t', h'⟩
 
 end SortedMap
 

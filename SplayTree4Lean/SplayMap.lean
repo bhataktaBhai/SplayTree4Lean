@@ -18,8 +18,8 @@ def toStr [ToString α] [ToString β] (header : String) : SplayMap α β → Str
   | node yk yv yL yR => header ++ toString (yk, yv) ++ "\n" ++ toStr header' yL ++ toStr header' yR
       where header' := header ++ "    "
 
-instance [ToString α] [ToString β] : ToString (SplayMap α β) where
-  toString := toStr ""
+instance [ToString α] [ToString β] : ToString (SplayMap α β) :=
+  ⟨toStr ""⟩
 
 @[simp]
 def splayMem (t : SplayMap α β) (x : α) : Prop :=
@@ -138,23 +138,26 @@ def val (t : SplayMap α β) (h : t ≠ nil) : β :=
   | nil => by trivial
   | node _ value _ _ => value
 
-def leftChild (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
+def left (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
   match t with
   | nil => by trivial
   | node _ _ left _ => left
 
-def rightChild (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
+def right (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β :=
   match t with
   | nil => by trivial
   | node _ _ _ right => right
 
+lemma temp (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) :
+    t matches node yk yv (node ylk ylv yLL yLR) yR := sorry
+
 /-- Rotates the edge joining the supplied node and its left child, if it exists. -/
-def rotateLeftChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.leftChild h1 ≠ nil) : SplayMap α β :=
- (node ((t.leftChild h1).key h2) ((t.leftChild h1).val h2) ((t.leftChild h1).leftChild h2) (node (t.key h1) (t.val h1) ((t.leftChild h1).rightChild h2) (t.rightChild h1)))
+def rotateLeftChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) : SplayMap α β :=
+ (node ((t.left h1).key h2) ((t.left h1).val h2) ((t.left h1).left h2) (node (t.key h1) (t.val h1) ((t.left h1).right h2) (t.right h1)))
 
 /-- Rotates the edge joining the supplied node and its right child, if it exists. -/
-def rotateRightChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.rightChild h1 ≠ nil) : SplayMap α β :=
- (node ((t.rightChild h1).key h2) ((t.rightChild h1).val h2) (node (t.key h1) (t.val h1) (t.leftChild h1) ((t.rightChild h1).leftChild h2)) ((t.rightChild h1).rightChild h2))
+def rotateRightChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.right h1 ≠ nil) : SplayMap α β :=
+ (node ((t.right h1).key h2) ((t.right h1).val h2) (node (t.key h1) (t.val h1) (t.left h1) ((t.right h1).left h2)) ((t.right h1).right h2))
 
 omit [DecidableEq α] [DecidableEq β] in
 theorem sorted_implies_left_sorted (t : SplayMap α β) (h : t ≠ nil) :
@@ -249,7 +252,7 @@ inductive Location
   | root | left | right
 
 /-- Returns the `Location` of the supplied value in the supplied tree. -/
-def locationOf (t : SplayMap α β) (x : α) : Option (Location) :=
+def locationOf (t : SplayMap α β) (x : α) : Option Location :=
   match t with
   | nil => none
   | node yk _ yL yR =>
@@ -259,14 +262,14 @@ def locationOf (t : SplayMap α β) (x : α) : Option (Location) :=
       match yL with
       | nil => none
       | node ylk _ _ _ =>
-          if x = ylk then Location.left
-          else none
+        if x = ylk then Location.left
+        else none
     else
       match yR with
       | nil => none
       | node yrk _ _ _ =>
-          if x = yrk then Location.right
-          else none
+        if x = yrk then Location.right
+        else none
 
 def atRoot (t : SplayMap α β) (x : α) : Prop :=
   match t with
@@ -528,8 +531,15 @@ theorem sorted_nil_iff_splay_nil (t : SortedMap α β) :
   · apply Subtype.eq
     simpa only
 
+<<<<<<< Updated upstream
 def leftChild (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
   ⟨t.val.leftChild h, sorted_implies_left_sorted t.val h t.prop⟩
+=======
+def left (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
+  let t' := (t.val).left h
+  have h' : is_sorted t' := by
+    let ⟨t, h⟩ := t
+>>>>>>> Stashed changes
 
 def rightChild (t : SortedMap α β) (h : t.val ≠ SplayMap.nil) : SortedMap α β :=
   ⟨t.val.rightChild h, sorted_implies_right_sorted t.val h t.prop⟩
@@ -554,7 +564,7 @@ def min (t : SortedMap α β) (h : t ≠ nil) : α :=
 termination_by t.val.size
 decreasing_by (exact size_mono_left t.val h0)
 
-def rotateLeftChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).leftChild h1 ≠ SplayMap.nil) : SortedMap α β :=
+def rotateLeftChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).left h1 ≠ SplayMap.nil) : SortedMap α β :=
   let t' := (t.val).rotateLeftChild h1 h2
   have h' : t'.is_sorted := by
     cases t.val with
@@ -566,7 +576,7 @@ def rotateLeftChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t
     sorry
   ⟨t', h'⟩
 
-def rotateRightChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).rightChild h1 ≠ SplayMap.nil) : SortedMap α β :=
+def rotateRightChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).right h1 ≠ SplayMap.nil) : SortedMap α β :=
   let t' := (t.val).rotateRightChild h1 h2
   have h' : t'.is_sorted := by sorry
   ⟨t', h'⟩

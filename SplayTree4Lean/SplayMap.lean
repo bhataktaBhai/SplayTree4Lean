@@ -206,6 +206,7 @@ theorem Sorted_implies_right_Sorted (t : SplayMap α β) (h : t ≠ nil) :
     simp [right]
     exact sR
 
+omit [DecidableEq α] [DecidableEq β] in
 theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
     Sorted t → Sorted (rotateLeftChild t nt nL) := by
   intro st
@@ -221,12 +222,61 @@ theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (
       .node yk yv yLR yR (by simp_all) smallerR sLR sR
     have ylk_bigger_yLL : Forall (fun k => k < ylk) yLL := match sL with
       | .node _ _ _ _ bigger_ylk smaller_ylk _ _ => bigger_ylk
-    have ylk_smaller_yk : ylk < yk := sorry
-    exact .node ylk ylv yLL (node yk yv yLR yR) ylk_bigger_yLL (sorry) sLL snewR
+    have ylk_smaller_yLR : Forall (fun k => ylk < k) yLR := match sL with
+      | .node _ _ _ _ bigger_ylk smaller_ylk _ _ => smaller_ylk
+    have ylk_smaller_yk : ylk < yk := biggerL.1
+    rw [Forall] at ylk_bigger_yLL
+    have ylk_smaller_right : Forall (fun k => ylk < k) (node yk yv yLR yR) := by
+      intro x hx
+      cases hx with
+      | inl h_eq =>
+        rw [h_eq]
+        exact ylk_smaller_yk
+      | inr hx' =>
+        cases hx' with
+        | inl h_in =>
+          simp_all only [ne_eq, true_and, instSplayMapMem, Forall]
+        | inr h_in =>
+          have h_temp : ylk < yk := ylk_smaller_yk
+          have h_yk_x : yk < x := smallerR x h_in
+          exact lt_trans h_temp h_yk_x
+    exact .node ylk ylv yLL (node yk yv yLR yR) ylk_bigger_yLL ylk_smaller_right sLL snewR
 
-theorem sorted_implies_rotateLeft_sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
-    t.is_sorted → (rotateLeftChild t nt nL).is_sorted := by
-  sorry
+omit [DecidableEq α] [DecidableEq β] in
+theorem Sorted_implies_rotateRight_Sorted (t : SplayMap α β) (nt : t ≠ nil) (nR : t.right nt ≠ nil) :
+    Sorted t → Sorted (rotateRightChild t nt nR) := by
+  intro st
+  match t, st with
+  | node yk yv yL (node yrk yrv yRL yRR), .node _ _ _ _ biggerL smallerR sL sR =>
+    simp only [rotateRightChild, nt, nR]
+    have sRL : Sorted yRL := match sR with
+      | .node _ _ _ _ biggerRL smallerRR sRL sRR => sRL
+    have sRR : Sorted yRR := match sR with
+      | .node _ _ _ _ biggerRL smallerRR sRL sRR => sRR
+    simp_all!
+    have snewL : Sorted (node yk yv yL yRL) :=
+      .node yk yv yL yRL (by simp_all) (by simp_all) sL sRL
+    have yrk_smaller_yRR : Forall (fun k => yrk < k) yRR := match sR with
+      | .node _ _ _ _ bigger_yrk smaller_yrk _ _ => smaller_yrk
+    have yrk_bigger_yRL : Forall (fun k => k < yrk) yRL := match sR with
+      | .node _ _ _ _ bigger_yrk smaller_yrk _ _ => bigger_yrk
+    have yrk_bigger_yk : yk < yrk := smallerR.1
+    rw [Forall] at yrk_smaller_yRR
+    have yrk_bigger_left : Forall (fun k => k < yrk) (node yk yv yL yRL) := by
+      intro x hx
+      cases hx with
+      | inl h_eq =>
+        rw [h_eq]
+        exact yrk_bigger_yk
+      | inr hx' =>
+        cases hx' with
+        | inl h_in =>
+          have h_temp : yk < yrk := yrk_bigger_yk
+          have h_x_yk : x < yk := biggerL x h_in
+          exact lt_trans h_x_yk h_temp
+        | inr h_in =>
+          simp_all only [ne_eq, true_and, instSplayMapMem, Forall]
+    exact .node yrk yrv (node yk yv yL yRL) yRR yrk_bigger_left yrk_smaller_yRR snewL sRR
 
 def size : SplayMap α β → Nat
   | SplayMap.nil => 0
@@ -519,7 +569,6 @@ theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) 
   sorry
 
 def search (t : SplayMap α β) (x : α) : SplayMap α β :=
-  match t with
-  | nil => nil
+  sorry
 
 end SplayMap

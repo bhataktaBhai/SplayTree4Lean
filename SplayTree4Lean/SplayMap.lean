@@ -131,6 +131,7 @@ def is_sorted : SplayMap α β → Prop
 --       Forall p yR →
 --     Forall p (node yk yv yL yR)
 
+@[simp]
 def Forall (p : α → Prop) (t : SplayMap α β) : Prop :=
   ∀ x ∈ t, p x
 
@@ -149,9 +150,11 @@ def key (t : SplayMap α β) (h : t ≠ nil) : α := match t with
 def value (t : SplayMap α β) (h : t ≠ nil) : β := match t with
   | node _ value _ _ => value
 
+@[simp]
 def left (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
   | node _ _ left _ => left
 
+@[simp]
 def right (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
   | node _ _ _ right => right
 
@@ -184,6 +187,7 @@ theorem sorted_implies_right_sorted (t : SplayMap α β) (h : t ≠ nil) :
     exact h'.2.2.2
 
 omit [DecidableEq α] [DecidableEq β] in
+@[simp]
 theorem Sorted_implies_left_Sorted (t : SplayMap α β) (h : t ≠ nil) :
     Sorted t → Sorted (t.left h) := by
   intro st
@@ -193,6 +197,7 @@ theorem Sorted_implies_left_Sorted (t : SplayMap α β) (h : t ≠ nil) :
     exact sL
 
 omit [DecidableEq α] [DecidableEq β] in
+@[simp]
 theorem Sorted_implies_right_Sorted (t : SplayMap α β) (h : t ≠ nil) :
     Sorted t → Sorted (t.right h) := by
   intro st
@@ -212,17 +217,16 @@ theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (
     have sLR : Sorted yLR := match sL with
       | .node _ _ _ _ biggerLL smallerLR sLL sLR => sLR
     simp_all!
-    have snewR : Sorted (node yk yv yLR yR) := match biggerL with
-      | .node _ _ _ _ bigger_ylk biggerLL biggerLR =>
-        .node yk yv yLR yR biggerLR smallerR sLR sR
-    have ylk_bigger_yLL : Forall (fun k _ => k < ylk) yLL := match sL with
+    have snewR : Sorted (node yk yv yLR yR) :=
+      .node yk yv yLR yR (by simp_all) smallerR sLR sR
+    have ylk_bigger_yLL : Forall (fun k => k < ylk) yLL := match sL with
       | .node _ _ _ _ bigger_ylk smaller_ylk _ _ => bigger_ylk
     have ylk_smaller_yk : ylk < yk := sorry
     exact .node ylk ylv yLL (node yk yv yLR yR) ylk_bigger_yLL (sorry) sLL snewR
 
 theorem sorted_implies_rotateLeft_sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
     t.is_sorted → (rotateLeftChild t nt nL).is_sorted := by
-
+  sorry
 
 def size : SplayMap α β → Nat
   | SplayMap.nil => 0
@@ -242,7 +246,7 @@ lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.right h
     rw [size, right]
     omega
 
--- theorem le_max_of_mem (t : SplayMap α β) (h : t ≠ nil) (x : α) (hx : x ∈ t) :
+-- theorem le_max_of_mem (t : SplayMap α β) (h : t ≠ nil) (x : α) (mx : x ∈ t) :
 --   x ≤ max t h := by
 --   have h' : t.keyList ≠ [] := by
 --     simp_all only [ne_eq, bne_iff_ne, mem_iff_mem_key_list, splayMem]
@@ -322,58 +326,6 @@ def atRight (t : SplayMap α β) (x : α) : Prop :=
 
 -- TODO: do we use the three above functions anywhere? should we use them in `locationOf`?
 
-/-
-Looks for a value `x` in a `SplayMap`.
-If found, splays the tree at that node, executing zig-zig and zig-zag steps
-but *not* a zig step.
-That is, if `x` ends up as a child of the root, a final rotation to bring it to
-the root is *not* performed.
-This is necessary for recursion to work in the `splay` function.
--/
-
--- def splayButOne (t : SplayMap α β) (x : α) : SplayMap α β :=
---   match t with
---   | nil => nil
---   | node yk yv yL yR =>
---       if x = yk then
---         t
---       else if x < yk then
---         let yL' := yL.splayButOne x
---         match yL'.locationOf x with
---         | Location.root => node yk yv yL' yR
---         | Location.left =>
---           match rotateLeftChild (node yk yv yL' yR) with
---           | some t1 =>
---             match rotateLeftChild t1 with
---             | some t2 => t2
---             | none => t1
---           | none => node yk yv yL' yR
---         | Location.right =>
---           match rotateRightChild yL' with
---           | some newYl =>
---             match rotateLeftChild (node yk yv newYl yR) with
---             | some t' => t'
---             | none => node yk yv newYl yR
---           | none => node yk yv yL' yR
---         | none => sorry
---       else
---         let yR' := yR.splayButOne x
---         match yR'.locationOf x with
---         | Location.root => node yk yv yL yR'
---         | Location.right =>
---           match rotateRightChild (node yk yv yL yR') with
---           | some t1 =>
---             match rotateRightChild t1 with
---             | some t2 => t2
---             | none => t1
---           | none => node yk yv yL yR'
---         | Location.left =>
---           match rotateLeftChild yR' with
---           | some newYr =>
---             match rotateRightChild (node yk yv yL newYr) with
---             | some t' => t'
---             | none => node yk yv yL newYr
---          | none => node yk yv yL yR'
 
 -- theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
 --     (t.splayButOne x).locationOf x ≠ .idk := by
@@ -396,96 +348,17 @@ This is necessary for recursion to work in the `splay` function.
 --       else
 --         sorry
 
-/-
-Looks for a value `x` in a `SplayMap`.
-If found, splays the tree at that node.
--/
--- def splay (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
---   let t' := t.splayButOne x
---   let loc := t'.locationOf x
---   have h' : loc ≠ .idk := splayButOneMemberLocation t x h
---   match loc with
---   | .root => t
---   | .left => rotateLeftChild t
---   | .right => rotateRightChild t
---   | .idk => by trivial
-
--- theorem splay_preserves_membership
---     (t : SplayMap α β) (x : α) (h : x ∈ t) : x ∈ splay t x h := by
---   let t' := t.splayButOne x
---   let loc := t'.locationOf x
---   have h' : loc ≠ .idk := splayButOneMemberLocation t x h
---   have mem_sbo : x ∈ t' := by sorry
---
---   match loc with
---   | .root => sorry
---   | .left => sorry
---   | .right => sorry
---   | .idk => simp at h'
-
-
--- theorem splayMember (t : SplayMap α β) (x : α) (h : x ∈ t) :
---     (t.splay? x h).isSome := by
---   sorry
-
-/-- Return the last non-nil (key, value) pair on the search path to `x`. -/
-def search? (t : SplayMap α β) (x : α) : Option (α × β) :=
-  match t with
-  | nil => none
-  | node yk yv yL yR =>
-      if x = yk then
-        (yk, yv)
-      else if x < yk then
-        match search? yL x with
-        | none => (yk, yv)
-        | some (zk, zv) => some (zk, zv)
-      else
-        match search? yR x with
-        | none => (yk, yv)
-        | some (zk, zv) => some (zk, zv)
-      /- Alternative if easier to prove:
-      let k :=
-        if x = yk then
-          some x
-        else if x < yk then
-          search? yL x
-        else
-          search? yR x
-      if k matches none then yk else k
-      -/
-
--- theorem searchMember (t : SplayMap α β) (x : α) (h : t ≠ nil) :
---   (t.search? x).isSome ∧ ((t.search? x).get!.1 ∈ t) := sorry
-
-/-- Alias for `splay?`. -/
-def get (t : SplayMap α β) (x : α) : SplayMap α β × Option β :=
-  let ykv? := t.search? x
-  match ykv? with
-  | none => (t, none) -- TODO: prove `t` is `nil`
-  | some (yk, yv) => sorry
-      -- let t := t.splay? yk
-      -- have t_isSome : t.isSome := sorry
-      -- let t := -- TODO: prove this is safe
-      -- have yk_mem : yk ∈ t := sorry
-      -- match t with
-      -- | nil => (nil, none) -- TODO: prove this does not happen
-      -- | node yk' yv' _ _ =>
-      --     if yk' = yk then (t, some yv')
-      --     else (t, none)
-  -- match yk with
-  -- | none => (t, none) -- means t is nil
-  -- | some yk => sorry
 
 /- Doesn't work, needs rewriting `splay?`. -/
-/- def split (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
+def split (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
   let t' := t.splay x h
   have h' : x ∈ t' := splay_preserves_membership t x h
   match t' with
-  | nil => absurd h (by trivial)
+  | nil => by contradiction
   | node yk yv yL yR =>
       if x ≤ yk then (yL, node yk yv nil yR)
       else (node yk yv yL nil, yR)
--/
+
 
 /- Joins two splay trees where all keys in A are less than all keys in B -/
 -- def join (A B : SplayMap α β) : SplayMap α β :=
@@ -547,5 +420,106 @@ theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
 /- Builds a `SplayMap` from a `List` by inserting its elements one-by-one. -/
 -- def fromList (L : List (α × β)) : SplayMap α β :=
 --   L.foldl (fun t (xk, xv) => t.insert xk xv) nil
+/-- Return the last non-nil key on the search path to `x`. -/
+
+/--
+Looks for a value `x` in a `SplayMap`.
+If found, splays the tree at that node, executing zig-zig and zig-zag steps
+but *not* a zig step.
+That is, if `x` ends up as a child of the root, a final rotation to bring it to
+the root is *not* performed.
+This is necessary for recursion to work in the `splay` function.
+-/
+def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β :=
+  match ht : t with
+  | nil => by contradiction
+  | node yk yv yL yR =>
+      if x = yk then
+        t
+      else if x < yk then
+        let yL' : SplayMap α β :=
+          yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x (sorry)
+        match yL'.locationOf x with
+        | Location.root => node yk yv yL' yR
+        | Location.left =>
+          match rotateLeftChild (node yk yv yL' yR) with
+          | some t1 =>
+            match rotateLeftChild t1 with
+            | some t2 => t2
+            | none => t1
+          | none => node yk yv yL' yR
+        | Location.right =>
+          match rotateRightChild yL' with
+          | some newYl =>
+            match rotateLeftChild (node yk yv newYl yR) with
+            | some t' => t'
+            | none => node yk yv newYl yR
+          | none => node yk yv yL' yR
+        | none => sorry
+      else
+        let yR' := yR.splayButOne x
+        match yR'.locationOf x with
+        | Location.root => node yk yv yL yR'
+        | Location.right =>
+          match rotateRightChild (node yk yv yL yR') with
+          | some t1 =>
+            match rotateRightChild t1 with
+            | some t2 => t2
+            | none => t1
+          | none => node yk yv yL yR'
+        | Location.left =>
+          match rotateLeftChild yR' with
+          | some newYr =>
+            match rotateRightChild (node yk yv yL newYr) with
+            | some t' => t'
+            | none => node yk yv yL newYr
+         | none => node yk yv yL yR'
+
+def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
+  match ht : t with
+  | nil => by contradiction
+  | node yk yv yL yR =>
+    if x = yk then
+      yk
+    else if x < yk then
+      if nyL : yL = .nil then
+        yk
+      else
+        have : yL.size < t.size := by
+          simp_all [SplayMap.size]; omega
+        last_to yL nyL x
+    else
+      if nyR : yR = .nil then
+        yk
+      else
+        have : yR.size < t.size := by
+          simp_all [SplayMap.size]
+        last_to yR nyR x
+
+theorem last_to_mem (t : SplayMap α β) (nt : t ≠ nil) (x : α) : t.last_to nt x ∈ t := by
+  induction t with
+  | nil => contradiction
+  | node yk yv yL yR iL iR =>
+    if x = yk then
+      simp_all [last_to]
+    else if x < yk then
+      if nyL : yL = .nil then
+        simp_all [last_to]
+      else
+        simp_all [last_to]
+    else
+      if nyR : yR = .nil then
+        simp_all [last_to]
+      else
+        simp_all [last_to]
+        aesop
+
+theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) (x : α) (mx : x ∈ t) :
+    t.last_to nt x = x := by
+  sorry
+
+def search (t : SplayMap α β) (x : α) : SplayMap α β :=
+  match t with
+  | nil => nil
 
 end SplayMap

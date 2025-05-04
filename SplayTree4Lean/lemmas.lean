@@ -26,6 +26,13 @@ variable {α : Type u} [LinearOrder α]
 --     | nil => rfl
 --     | node xk xv xL xR => simp [rotateLeftChild, toList]
 
+@[simp]
 lemma lt_gt_false (x y : α) (hlt : x < y) (hgt : y < x) : False := by
   have : x < x := lt_trans' hgt hlt
   simp_all
+
+@[simp]
+lemma gt_of_ne_not_lt (x y : α) (hneq : ¬x = y) (hlt : ¬x < y) : y < x := by
+  have h := lt_or_lt_iff_ne.mpr hneq
+  have h' := Or.resolve_left h
+  exact h' hlt

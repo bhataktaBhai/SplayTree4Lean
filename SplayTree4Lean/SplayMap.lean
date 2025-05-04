@@ -659,6 +659,10 @@ theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α)
     x ∈ t.splay st x mx := by
   sorry
 
+theorem splay_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    Sorted (t.splay st x mx) := by
+  sorry
+
 def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
   match ht : t with
   | nil => by contradiction
@@ -700,13 +704,42 @@ theorem last_to_mem (t : SplayMap α β) (nt : t ≠ nil) (x : α) : t.last_to n
 
 theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) (x : α) (mx : x ∈ t) :
     t.last_to nt x = x := by
-  sorry
+  induction t with
+  | nil => contradiction
+  | node yk yv yL yR iL iR =>
+    if x_eq_yk : x = yk then
+      simp_all [last_to]
+    else if x_vs_yk : x < yk then
+      have := (node yk yv yL yR).mem_lt_key_implies_mem_left st x mx
+      have mxL : x ∈ yL := by simp_all
+      if nyL : yL = .nil then
+        simp_all
+      else
+        have : Sorted yL :=
+          (node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st
+        simp_all [last_to]
+    else
+      have := (node yk yv yL yR).mem_gt_key_implies_mem_right st x mx
+      have mxR : x ∈ yR := by simp_all
+      if nyR : yR = .nil then
+        simp_all
+      else
+        have : Sorted yR :=
+          (node yk yv yL yR).Sorted_implies_right_Sorted (by simp) st
+        simp_all [last_to]
 
-def search (t : SplayMap α β) (x : α) : SplayMap α β :=
-  sorry
+def search (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
+  match ht : t with
+  | nil => nil
+  | node yk yv yL yR => by
+    have nt : t ≠ nil := by simp_all
+    rw [←ht] at st
+    exact t.splay st (t.last_to nt x) (last_to_mem t nt x)
 
-theorem search_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) : Sorted (t.search x) := by
-  sorry
+theorem search_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) : Sorted (t.search st x) := by
+  match ht : t with
+  | nil => simp_all [search]
+  | node yk yv yL yR => simp_all [search, splay_preserves_sorted]
 
 def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
   let t' := t.splay st x h
@@ -717,8 +750,8 @@ def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap
       if x ≤ yk then (yL, node yk yv nil yR)
       else (node yk yv yL nil, yR)
 
-def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
-  let t' := t.search xk
+def insert (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) : SplayMap α β :=
+  let t' := t.search st xk
   match t' with
   | nil => nil
   | node k v L R =>
@@ -729,8 +762,20 @@ def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
     else
       node xk xv L (node k v nil R)
 
-def fromList : List (α × β) → SplayMap α β :=
-  List.foldr (fun (k, v) t => t.insert k v) nil
+theorem insert_preserves_sorted (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) :
+    Sorted (t.insert st xk xv) := by
+  sorry
+
+def fromList : List (α × β) → SplayMap α β
+  | [] => nil
+  | (xk, xv)::ls =>
+      let t := fromList ls
+      t.insert (sorry) xk xv
+  -- intro ls
+  -- have h : Sorted (nil : SplayMap α β) := Sorted.nil
+  -- let tst := List.foldr (fun (k, v) (t, st) => (t.insert st k v, insert_preserves_sorted t st k v))
+  --                     (nil, h) ls
+  -- exact Prod.fst tst
 
 /- Joins two splay trees where all keys in L are less than all keys in R -/
 def join (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R) (ord : ∀ x y, x ∈ L → y ∈ R → x < y) :
@@ -748,7 +793,7 @@ def join (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R) (ord : ∀ x y, 
       | nil => sorry
 
 def delete (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
-  let t' := t.search x
+  let t' := t.search st x
   match ht' : t' with
   | nil => nil
   | node k v L R => by
@@ -764,7 +809,7 @@ def delete (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
       exact panic! "key not found"
 
 def delete! (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
-  let t' := t.search x
+  let t' := t.search st x
   match ht' : t' with
   | nil => nil
   | node k v L R => by
@@ -778,9 +823,5 @@ def delete! (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
       exact join L R sL sR ((node k v L R).Sorted_implies_left_lt_right (by simp) st')
     else
       exact t'
-
-theorem locationProp (t : SplayMap α β) (x : α) :
-  if t.locationOf x = Location.root then
-    t.atRoot x
 
 end SplayMap

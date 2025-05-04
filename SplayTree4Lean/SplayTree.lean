@@ -13,21 +13,21 @@ namespace SplayTree
 def nil : SplayTree α :=
   SplayMap.nil
 def node (xk : α) : SplayTree α → SplayTree α → SplayTree α :=
-  SplayMap.node xk Unit.unit
+  SplayMap.node xk .unit
 
 def toStr [ToString α] (header : String) : SplayTree α → String
   | SplayMap.nil => header ++ "nil\n"
   | SplayMap.node yk _ yL yR => header ++ toString yk ++ "\n" ++ toStr header' yL ++ toStr header' yR
       where header' := header ++ "    "
 
-instance [ToString α] : ToString (SplayTree α) where
+instance [ToString α] : ToString (SplayTree α) :=
   ⟨toStr ""⟩
+
+instance instSplayTreeMem : Membership α (SplayTree α) :=
+  inferInstanceAs (Membership α (SplayMap α Unit))
 
 #synth DecidableEq (SplayMap Nat Unit)
 #synth DecidableEq (SplayTree Nat)
-
-def find : SplayTree α → α → SplayTree α :=
-  SplayMap.find
 
 def insert (t : SplayTree α) (xk : α) : SplayTree α :=
   SplayMap.insert t xk Unit.unit

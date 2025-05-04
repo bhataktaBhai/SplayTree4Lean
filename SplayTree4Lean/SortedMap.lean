@@ -246,4 +246,3 @@ def five? : Option Nat := Option.some 5
 
 #eval five?.get!
 #eval (2, 3).1
-

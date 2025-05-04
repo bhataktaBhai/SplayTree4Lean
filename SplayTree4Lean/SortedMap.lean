@@ -67,56 +67,41 @@ theorem plus_one (n : ℕ) : n + 1 > n := by
   | succ n => simp
 
 def rotateLeftChild (t : SortedMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) : SortedMap α β :=
-  -- let t' := match t.val with
-  -- | node yk yv (node ylk ylv yLL yLR) yR =>
-  --   node ylk ylv yLL (node yk yv yLR yR) -- how is Lean so smart?!
-  -- | node yk yv .nil yR => sorry
-  -- | .nil => sorry
-  have ht : t.val ≠ .nil := by simp [h1]
-  have htl : t.val.left ht ≠ .nil := by sorry
-  let t' := SplayMap.rotateLeftChild t.val ht htl
-  have h' : (SplayMap.rotateLeftChild t.val ht htl).is_sorted := by
-    induction t.val with
-    | nil => 
-      have hh : t.val = .nil := by simp_all!
-      sorry
-    | node yk yv yL yR ihL ihR => sorry
-    match h : t.val with
+  have h1' : t.val ≠ SplayMap.nil := by simp [h1]
+  have h2' : (t.val).left h1' ≠ SplayMap.nil := by
+    have h2'a : (t.left h1) ≠ nil := by simp [h2]
+    have h2'b : (t.val).left h1' = (t.left h1).val := by
+      simp_all only [ne_eq, not_false_eq_true]
+      rfl
+    simp only [h2'a, h2'b, ne_eq, not_false_eq_true, sorted_not_nil_implies]
+  let t' := (t.val).rotateLeftChild h1' h2'
+  have h' : t'.is_sorted := by
+    match t.val with
     | .nil =>
-      contradiction
-    | node yk yv .nil yR =>
-      have htl' : t.val.left ht = .nil := by simp_all! only
-      contradiction
-    | node yk yv (node ylk ylv yLL yLR) yR =>
-      simp_all [SplayMap.rotateLeftChild, t', ht]
-      match t.val, ht, htl with
-      | node yk yv (node ylk ylv yLL yLR) yR, h1, h2 =>
-        simp only
-      -- unfold SplayMap.is_sorted
-      match t' with
-      | .nil => trivial
-      | node _ _ l r => simp only
-      have hl : (t.1.left h).is_sorted := sorted_implies_left_sorted t.1 h t.2
-      have htl : t.1.left h = l := by
-        simp [ht]
-        rw [SplayMap.left]
-      have hl' : l.is_sorted := by simp_all
-      have hr : (t.1.right h).is_sorted := sorted_implies_right_sorted t.1 h t.2
-      have htr : t.1.right h = r := by
-        simp [ht]
-        rw [SplayMap.right]
-      have hr' : r.is_sorted := by simp_all
-
-      -- unfold SplayMap.is_sorted
-      -- match t' with
-      -- | .nil => trivial
-      -- | .node _ _ _ _ =>
-      -- exact h''
+        have h3 : t.val = SplayMap.nil := by
+          sorry
+        simp_all only
+    | node yk yv yL yR =>
+      sorry
   ⟨t', h'⟩
 
-def rotateRightChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).right h1 ≠ SplayMap.nil) : SortedMap α β :=
-  let t' := (t.val).rotateRightChild h1 h2
-  have h' : t'.is_sorted := by sorry
+def rotateRightChild (t : SortedMap α β) (h1 : t ≠ nil) (h2 : t.right h1 ≠ nil) : SortedMap α β :=
+  have h1' : t.val ≠ SplayMap.nil := by simp [h1]
+  have h2' : (t.val).right h1' ≠ SplayMap.nil := by
+    have h2'a : (t.right h1) ≠ nil := by simp [h2]
+    have h2'b : (t.val).right h1' = (t.right h1).val := by
+      simp_all only [ne_eq, not_false_eq_true]
+      rfl
+    simp only [h2'a, h2'b, ne_eq, not_false_eq_true, sorted_not_nil_implies]
+  let t' := (t.val).rotateRightChild h1' h2'
+  have h' : t'.is_sorted := by
+    match t.val with
+    | .nil =>
+        have h3 : t.val = SplayMap.nil := by
+          sorry
+        simp_all only
+    | node yk yv yL yR =>
+      sorry
   ⟨t', h'⟩
 
 /--
@@ -213,4 +198,3 @@ def five? : Option Nat := Option.some 5
 
 #eval five?.get!
 #eval (2, 3).1
-

@@ -5,7 +5,7 @@ variable {α : Type u} [LinearOrder α] [DecidableEq α]
 variable {β : Type v} [DecidableEq β]
 
 def SortedMap (α : Type u) (β : Type v) [LinearOrder α] :=
-  { t : SplayMap α β // SplayMap.is_sorted t }
+  { t : SplayMap α β // SplayMap.Sorted t }
 
 instance [DecidableEq (SplayMap α β)]: DecidableEq (SortedMap α β) :=
   fun s t => if h : s.val = t.val then isTrue (Subtype.eq h) else isFalse (fun p => by cases p; contradiction)
@@ -14,9 +14,13 @@ namespace SortedMap
 open SplayMap
 
 def nil : SortedMap α β :=
-  ⟨SplayMap.nil, trivial⟩
+  ⟨.nil, .nil⟩
+
+instance instSortedMapMem : Membership α (SortedMap α β) :=
+  ⟨fun t x => x ∈ t.val⟩
 
 omit [DecidableEq α] [DecidableEq β] in
+@[simp]
 theorem sorted_nil_iff (t : SortedMap α β) : t = nil ↔ t.val = .nil := by
   apply Iff.intro <;> intro h
   · subst h
@@ -36,11 +40,11 @@ def value (t : SortedMap α β) (h : t ≠ nil) : β :=
   t.val.value (by simp [h])
 
 def left (t : SortedMap α β) (h : t ≠ nil) : SortedMap α β :=
-  ⟨t.val.left h', sorted_implies_left_sorted t.val h' t.prop⟩
+  ⟨t.val.left h', Sorted_implies_left_Sorted t.val h' t.prop⟩
     where h' : t.val ≠ .nil := by simp [h]
 
 def right (t : SortedMap α β) (h : t ≠ nil) : SortedMap α β :=
-  ⟨t.val.right h', sorted_implies_right_sorted t.val h' t.prop⟩
+  ⟨t.val.right h', Sorted_implies_right_Sorted t.val h' t.prop⟩
     where h' : t.val ≠ .nil := by simp [h]
 
 def max (t : SortedMap α β) (h : t ≠ nil) : α :=
@@ -61,62 +65,47 @@ def min (t : SortedMap α β) (h : t ≠ nil) : α :=
 termination_by t.val.size
 decreasing_by (exact size_mono_left t.val h0)
 
-theorem plus_one (n : ℕ) : n + 1 > n := by
+example (n : ℕ) : n + 1 > n := by
   induction n with
   | zero => trivial
   | succ n => simp
 
 def rotateLeftChild (t : SortedMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) : SortedMap α β :=
-  -- let t' := match t.val with
-  -- | node yk yv (node ylk ylv yLL yLR) yR =>
-  --   node ylk ylv yLL (node yk yv yLR yR) -- how is Lean so smart?!
-  -- | node yk yv .nil yR => sorry
-  -- | .nil => sorry
-  have ht : t.val ≠ .nil := by simp [h1]
-  have htl : t.val.left ht ≠ .nil := by sorry
-  let t' := SplayMap.rotateLeftChild t.val ht htl
-  have h' : (SplayMap.rotateLeftChild t.val ht htl).is_sorted := by
-    induction t.val with
-    | nil => 
-      have hh : t.val = .nil := by simp_all!
-      sorry
-    | node yk yv yL yR ihL ihR => sorry
-    match h : t.val with
+  have h1' : t.val ≠ SplayMap.nil := by simp [h1]
+  have h2' : (t.val).left h1' ≠ SplayMap.nil := by
+    have h2'a : (t.left h1) ≠ nil := by simp [h2]
+    have h2'b : (t.val).left h1' = (t.left h1).val := by
+      simp_all only [ne_eq, not_false_eq_true]
+      rfl
+    simp only [h2'a, h2'b, ne_eq, not_false_eq_true, sorted_not_nil_implies]
+  let t' := (t.val).rotateLeftChild h1' h2'
+  have h' : t'.is_sorted := by
+    match t.val with
     | .nil =>
-      contradiction
-    | node yk yv .nil yR =>
-      have htl' : t.val.left ht = .nil := by simp_all! only
-      contradiction
-    | node yk yv (node ylk ylv yLL yLR) yR =>
-      simp_all [SplayMap.rotateLeftChild, t', ht]
-      match t.val, ht, htl with
-      | node yk yv (node ylk ylv yLL yLR) yR, h1, h2 =>
-        simp only
-      -- unfold SplayMap.is_sorted
-      match t' with
-      | .nil => trivial
-      | node _ _ l r => simp only
-      have hl : (t.1.left h).is_sorted := sorted_implies_left_sorted t.1 h t.2
-      have htl : t.1.left h = l := by
-        simp [ht]
-        rw [SplayMap.left]
-      have hl' : l.is_sorted := by simp_all
-      have hr : (t.1.right h).is_sorted := sorted_implies_right_sorted t.1 h t.2
-      have htr : t.1.right h = r := by
-        simp [ht]
-        rw [SplayMap.right]
-      have hr' : r.is_sorted := by simp_all
-
-      -- unfold SplayMap.is_sorted
-      -- match t' with
-      -- | .nil => trivial
-      -- | .node _ _ _ _ =>
-      -- exact h''
+        have h3 : t.val = SplayMap.nil := by
+          sorry
+        simp_all only
+    | node yk yv yL yR =>
+      sorry
   ⟨t', h'⟩
 
-def rotateRightChild (t : SortedMap α β) (h1 : t.val ≠ SplayMap.nil) (h2 : (t.val).right h1 ≠ SplayMap.nil) : SortedMap α β :=
-  let t' := (t.val).rotateRightChild h1 h2
-  have h' : t'.is_sorted := by sorry
+def rotateRightChild (t : SortedMap α β) (h1 : t ≠ nil) (h2 : t.right h1 ≠ nil) : SortedMap α β :=
+  have h1' : t.val ≠ SplayMap.nil := by simp [h1]
+  have h2' : (t.val).right h1' ≠ SplayMap.nil := by
+    have h2'a : (t.right h1) ≠ nil := by simp [h2]
+    have h2'b : (t.val).right h1' = (t.right h1).val := by
+      simp_all only [ne_eq, not_false_eq_true]
+      rfl
+    simp only [h2'a, h2'b, ne_eq, not_false_eq_true, sorted_not_nil_implies]
+  let t' := (t.val).rotateRightChild h1' h2'
+  have h' : t'.is_sorted := by
+    match t.val with
+    | .nil =>
+        have h3 : t.val = SplayMap.nil := by
+          sorry
+        simp_all only
+    | node yk yv yL yR =>
+      sorry
   ⟨t', h'⟩
 
 /--
@@ -205,6 +194,50 @@ def splay (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
   | .left => rotateLeftChild t
   | .right => rotateRightChild t
   | .idk => by trivial
+
+/-- Return the last non-nil key on the search path to `x`. -/
+def last_to (t : SortedMap α β) (nt : t ≠ nil) (x : α) : α :=
+  match ht : t with
+  | ⟨.nil, p⟩ => by simp_all
+  | ⟨node yk yv yL yR, p⟩ =>
+    if x = yk then
+      yk
+    else if x < yk then
+      have syL : yL.Sorted :=
+        sorted_implies_left_sorted (node yk yv yL yR) (by simp_all) p
+      if nyL : yL = .nil then
+        yk
+      else
+        have : yL.size < t.val.size := by
+          simp_all [SplayMap.size]; omega
+        last_to ⟨yL, syL⟩ (by simp [nyL]) x
+    else
+      have syR : yR.Sorted :=
+        sorted_implies_right_sorted (node yk yv yL yR) (by simp_all) p
+      if nyR : yR = .nil then
+        yk
+      else
+        have : yR.size < t.val.size := by
+          simp_all [SplayMap.size]
+        last_to ⟨yR, syR⟩ (by simp [nyR]) x
+termination_by t.val.size
+
+theorem last_to_mem (t : SortedMap α β) (nt : t ≠ nil) (x : α) :
+    t.last_to nt x ∈ t := by
+  induction t.val with
+  | nil => unfold last_to
+  | node yk yv yL yR => sorry
+
+def last_to? (t : SortedMap α β) (x : α) : Option α :=
+  match ht : t with
+  | ⟨.nil, _⟩ => none
+  | ⟨node yk yv yL yR, p⟩ =>
+    some (last_to ⟨node yk yv yL yR, p⟩ (by simp_all) x)
+
+def search (t : SortedMap α β) (x : α) : SortedMap α β :=
+  match ht : t with
+  | nil => nil
+  | _ => t.splay x (x ∈ t)
 
 end SortedMap
 

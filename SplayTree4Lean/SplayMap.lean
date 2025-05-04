@@ -16,7 +16,7 @@ namespace SplayMap
 def toStr [ToString α] [ToString β] (header : String) : SplayMap α β → String
   | nil => header ++ "nil\n"
   | node yk yv yL yR => header ++ toString (yk, yv) ++ "\n" ++ toStr header' yL ++ toStr header' yR
-      where header' := header ++ "    "
+    where header' := header ++ "    "
 
 instance [ToString α] [ToString β] : ToString (SplayMap α β) :=
   ⟨toStr ""⟩
@@ -33,7 +33,7 @@ instance instSplayMapMem : Membership α (SplayMap α β) :=
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 lemma noMemNil : ∀ x, x ∉ (nil : SplayMap α β) := by
-  intro x h ; exact h
+  intro x h; exact h
 
 /-- Returns the (key, val) pairs of the tree in order. -/
 def toList : SplayMap α β → List (α × β)
@@ -41,9 +41,8 @@ def toList : SplayMap α β → List (α × β)
   | node xk xv xL xR => toList xL ++ [(xk, xv)] ++ toList xR
 
 /-- Returns the keys of the tree in order. -/
-def keyList : SplayMap α β → List α
-  | nil => []
-  | node xk _ xL xR => keyList xL ++ [xk] ++ keyList xR
+def keyList : SplayMap α β → List α :=
+  List.map Prod.fst ∘ toList
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, (x, y) ∈ t.toList := by
@@ -52,7 +51,7 @@ theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, 
     apply Iff.intro
     · intro a
       simp_all only [instSplayMapMem, splayMem]
-    · simp_all!
+    · simp [toList]
   | node yk yv yL yR ihL ihR =>
     apply Iff.intro <;> intro h
     · simp only at h
@@ -79,30 +78,19 @@ theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, 
         exact Or.inr (Or.inr (ihR.mpr ⟨y, hR⟩))
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-theorem mem_iff_mem_key_list (x : α) (t : SplayMap α β): x ∈ t ↔ x ∈ t.keyList := by
-  induction t with
-  | nil =>
-    apply Iff.intro <;> simp_all!
-  | node yk yv yL yR ihL ihR =>
-    apply Iff.intro <;> intro h
-    · simp only at h
-      cases h with
-      | inl h' => simp_all!
-      | inr h' => cases h' <;> simp_all!
-    · simp [keyList] at h
-      cases h with
-      | inl h' => simp_all!
-      | inr h' =>
-        cases h' with
-        | inl h'' => simp_all!
-        | inr h'' => simp_all!
+lemma mem_iff_mem_key_list (x : α) (t : SplayMap α β): x ∈ t ↔ x ∈ t.keyList := by
+  simp [keyList, mem_iff_mem_list]
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma key_list_empty_iff : ∀ t : SplayMap α β, t.keyList = [] ↔ t = nil
+theorem list_empty_iff : ∀ t : SplayMap α β, t.toList = [] ↔ t = nil
   | nil => by
-    simp [keyList]
+    simp [toList]
   | node key _ left right => by
-    simp [keyList]
+    simp [toList]
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma key_list_empty_iff : ∀ t : SplayMap α β, t.keyList = [] ↔ t = nil := by
+  simp [keyList, list_empty_iff]
 
 def max? (t : SplayMap α β) : Option α :=
   t.keyList.max?
@@ -133,6 +121,27 @@ def is_sorted : SplayMap α β → Prop
       ∧ (match min? right with | some m => k < m | none => True)
       ∧ is_sorted left
       ∧ is_sorted right
+
+-- TODO: is the below useful?
+-- inductive Forall (p : α → β → Prop) : SplayMap α β → Prop
+--   | nil : Forall p .nil
+--   | node yk yv yL yR :
+--       p yk yv →
+--       Forall p yL →
+--       Forall p yR →
+--     Forall p (node yk yv yL yR)
+
+def Forall (p : α → Prop) (t : SplayMap α β) : Prop :=
+  ∀ x ∈ t, p x
+
+inductive Sorted : SplayMap α β → Prop
+  | nil : Sorted nil
+  | node yk yv yL yR :
+      Forall (fun k => k < yk) yL →
+      Forall (fun k => yk < k) yR →
+      Sorted yL →
+      Sorted yR →
+    Sorted (node yk yv yL yR)
 
 def key (t : SplayMap α β) (h : t ≠ nil) : α := match t with
   | node key _ _ _ => key -- how is Lean so smart?!
@@ -173,6 +182,47 @@ theorem sorted_implies_right_sorted (t : SplayMap α β) (h : t ≠ nil) :
   | node yk yv yL yR => by
     intro h'
     exact h'.2.2.2
+
+omit [DecidableEq α] [DecidableEq β] in
+theorem Sorted_implies_left_Sorted (t : SplayMap α β) (h : t ≠ nil) :
+    Sorted t → Sorted (t.left h) := by
+  intro st
+  match t, st with
+  | node yk yv yL yR, .node _ _ _ _ biggerL smallerR sL sR =>
+    simp [left]
+    exact sL
+
+omit [DecidableEq α] [DecidableEq β] in
+theorem Sorted_implies_right_Sorted (t : SplayMap α β) (h : t ≠ nil) :
+    Sorted t → Sorted (t.right h) := by
+  intro st
+  match t, st with
+  | node yk yv yL yR, .node _ _ _ _ biggerL smallerR sL sR =>
+    simp [right]
+    exact sR
+
+theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
+    Sorted t → Sorted (rotateLeftChild t nt nL) := by
+  intro st
+  match t, st with
+  | node yk yv (node ylk ylv yLL yLR) yR, .node _ _ _ _ biggerL smallerR sL sR =>
+    simp only [rotateLeftChild, nt, nL]
+    have sLL : Sorted yLL := match sL with
+      | .node _ _ _ _ biggerLL smallerLR sLL sLR => sLL
+    have sLR : Sorted yLR := match sL with
+      | .node _ _ _ _ biggerLL smallerLR sLL sLR => sLR
+    simp_all!
+    have snewR : Sorted (node yk yv yLR yR) := match biggerL with
+      | .node _ _ _ _ bigger_ylk biggerLL biggerLR =>
+        .node yk yv yLR yR biggerLR smallerR sLR sR
+    have ylk_bigger_yLL : Forall (fun k _ => k < ylk) yLL := match sL with
+      | .node _ _ _ _ bigger_ylk smaller_ylk _ _ => bigger_ylk
+    have ylk_smaller_yk : ylk < yk := sorry
+    exact .node ylk ylv yLL (node yk yv yLR yR) ylk_bigger_yLL (sorry) sLL snewR
+
+theorem sorted_implies_rotateLeft_sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
+    t.is_sorted → (rotateLeftChild t nt nL).is_sorted := by
+
 
 def size : SplayMap α β → Nat
   | SplayMap.nil => 0

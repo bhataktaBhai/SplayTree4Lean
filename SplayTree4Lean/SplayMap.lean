@@ -34,7 +34,6 @@ instance instSplayMapMem : Membership α (SplayMap α β) :=
   ⟨splayMem⟩
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-@[simp]
 lemma noMemNil : ∀ x, x ∉ (nil : SplayMap α β) := by
   intro x h; exact h
 
@@ -239,6 +238,24 @@ lemma rotateRightChild_preserves_no_nil (t : SplayMap α β) (h1 : t ≠ nil) (h
   match t with
   | node yk yv yL (node yrk yrV yRL yRR) =>
     simp_all!
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma rotateLeft_preserves_membership (t : SplayMap α β) (nt : t ≠ nil) (ntL : t.left nt ≠ nil) :
+    ∀ x, x ∈ t → x ∈ rotateLeftChild t nt ntL := by
+  intro x mx
+  match t with
+  | node yk yv (node ylk ylv yLL yLR) yR =>
+    rw [rotateLeftChild]
+    aesop
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma rotateRight_preserves_membership (t : SplayMap α β) (nt : t ≠ nil) (ntR : t.right nt ≠ nil) :
+    ∀ x, x ∈ t → x ∈ rotateRightChild t nt ntR := by
+  intro x mx
+  match t with
+  | node yk yv yL (node yrk yrV yRL yRR) =>
+    rw [rotateRightChild]
+    aesop
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 lemma rotate_left_eq_grand_left (t : SplayMap α β) (nt : t ≠ nil) (ntL : t.left nt ≠ nil) :
@@ -527,6 +544,44 @@ theorem right_marries_atRight (t : SplayMap α β) (x : α) :
       rw [locationOf.eq_def] at *
       aesop
 
+omit [DecidableEq β] in
+theorem fancy_marriage_atLeft (t : SplayMap α β) (x : α) :
+    t.locationOf x matches (Location.left, _) → atLeft t x := by
+  intro ht
+  match tlx : t.locationOf x with
+  | (Location.left, ⟨P, p⟩) =>
+    have h1 : (t.locationOf x).2.prop = atLeft t x := by
+      rw [tlx]
+      simp
+      have hll := left_marries_atLeft t x (by simp_all)
+      have hP : (t.locationOf x).2.prop = P := by
+        simp_all
+      rw [hP] at hll
+      simp [hll]
+    simp_all
+  | (Location.right, ⟨P, p⟩) => simp_all
+  | (Location.root, ⟨P, p⟩) => simp_all
+  | (none, ⟨P, p⟩) => simp_all
+
+omit [DecidableEq β] in
+theorem fancy_marriage_atRight (t : SplayMap α β) (x : α) :
+    t.locationOf x matches (Location.right, _) → atRight t x := by
+  intro ht
+  match tlx : t.locationOf x with
+  | (Location.right, ⟨P, p⟩) =>
+    have h1 : (t.locationOf x).2.prop = atRight t x := by
+      rw [tlx]
+      simp
+      have hrr := right_marries_atRight t x (by simp_all)
+      have hP : (t.locationOf x).2.prop = P := by
+        simp_all
+      rw [hP] at hrr
+      simp [hrr]
+    simp_all
+  | (Location.left, ⟨P, p⟩) => simp_all
+  | (Location.root, ⟨P, p⟩) => simp_all
+  | (none, ⟨P, p⟩) => simp_all
+
   -- match t with
   -- | nil => trivial
   -- | node yk _ yL yR =>
@@ -669,15 +724,7 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
         match hyL' : yL'.locationOf x with
         | (Location.root, ⟨P, p⟩) => node yk yv yL' yR
         | (Location.left, ⟨P, p⟩) =>
-          have h1 : (yL'.locationOf x).2.prop = atLeft yL' x := by
-            rw [hyL']
-            simp
-            have hll := left_marries_atLeft yL' x (by simp_all)
-            have hP : (yL'.locationOf x).2.prop = P := by
-              simp_all
-            rw [hP] at hll
-            simp [hll]
-          have h1' : atLeft yL' x := by simp_all
+          have h1' : atLeft yL' x := by simp_all [fancy_marriage_atLeft]
           have nyL' : yL' ≠ nil := atLeft_implies_not_nil yL' x h1'
           have nyL'L : yL'.left nyL' ≠ nil := atLeft_implies_left_not_nil yL' x h1'
 
@@ -688,15 +735,7 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
           have nt'L : t'.left nt' ≠ nil := by simp_all
           t'.rotateLeftChild nt' nt'L
         | (Location.right, ⟨P, p⟩) =>
-          have h1 : (yL'.locationOf x).2.prop = atRight yL' x := by
-            rw [hyL']
-            simp
-            have hrl := right_marries_atRight yL' x (by simp_all)
-            have hP : (yL'.locationOf x).2.prop = P := by
-              simp_all
-            rw [hP] at hrl
-            simp [hrl]
-          have h1' : atRight yL' x := by simp_all
+          have h1' : atRight yL' x := by simp_all [fancy_marriage_atRight]
           have nyL' : yL' ≠ nil := atRight_implies_not_nil yL' x h1'
           have nyL'R : yL'.right nyL' ≠ nil := atRight_implies_right_not_nil yL' x h1'
 
@@ -742,21 +781,56 @@ theorem splayButOne_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x
 
 def splay (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β :=
   let t' := t.splayButOne st x mx
-  match lx : t'.locationOf x with
+  match t'lx : t'.locationOf x with
   | (Location.root, ⟨P, p⟩) => t'
-  | (Location.left, ⟨P, p⟩) => t'.rotateLeftChild (memNoNil t' x mx) (sorry)
-  | (Location.right, ⟨P, p⟩) => t'.rotateRightChild (sorry) (sorry)
+  | (Location.left, ⟨P, p⟩) =>
+        have : atLeft t' x := by simp_all [fancy_marriage_atLeft]
+        have nt' : t' ≠ nil := atLeft_implies_not_nil t' x this
+        have nt'L : t'.left nt' ≠ nil := atLeft_implies_left_not_nil t' x this
+        t'.rotateLeftChild nt' nt'L
+  | (Location.right, ⟨P, p⟩) =>
+        have : atRight t' x := by simp_all [fancy_marriage_atRight]
+        have nt' : t' ≠ nil := atRight_implies_not_nil t' x this
+        have nt'R : t'.right nt' ≠ nil := atRight_implies_right_not_nil t' x this
+        t'.rotateRightChild nt' nt'R
   | (none, ⟨True, trivial⟩) => by
     have : (t'.locationOf x).1 ≠ none := splayButOne_location t st x mx
-    sorry
+    simp [t'lx] at this
 
 theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     x ∈ t.splay st x mx := by
-  sorry
+  -- let t' := t.splayButOne st x mx
+  have mxsbo : x ∈ t.splayButOne st x mx := sorry
+  match t'lx : (t.splayButOne st x mx).locationOf x with
+  | (Location.root, ⟨P, p⟩) =>
+    rw [splay]
+    split <;> simp_all
+  | (Location.left, ⟨P, p⟩) =>
+    rw [splay]
+    split <;> simp_all [rotateLeft_preserves_membership]
+  | (Location.right, ⟨P, p⟩) =>
+    rw [splay]
+    split <;> simp_all [rotateRight_preserves_membership]
+  | (none, ⟨P, p⟩) =>
+    have := splayButOne_location t st x mx
+    simp_all
 
 theorem splay_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     Sorted (t.splay st x mx) := by
-  sorry
+  have ssbo : Sorted (t.splayButOne st x mx) := splayButOne_sorted t st x mx
+  match t'lx : (t.splayButOne st x mx).locationOf x with
+  | (Location.root, ⟨P, p⟩) =>
+    rw [splay]
+    split <;> simp_all
+  | (Location.left, ⟨P, p⟩) =>
+    rw [splay]
+    split <;> simp_all [Sorted_implies_rotateLeft_Sorted]
+  | (Location.right, ⟨P, p⟩) =>
+    rw [splay]
+    split <;> simp_all [Sorted_implies_rotateRight_Sorted]
+  | (none, ⟨P, p⟩) =>
+    have := splayButOne_location t st x mx
+    simp_all
 
 def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
   match ht : t with
@@ -797,8 +871,8 @@ theorem last_to_mem (t : SplayMap α β) (nt : t ≠ nil) (x : α) : t.last_to n
         simp_all [last_to]
         aesop
 
-theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) (x : α) (mx : x ∈ t) :
-    t.last_to nt x = x := by
+theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    t.last_to (memNoNil t x mx) x = x := by
   induction t with
   | nil => contradiction
   | node yk yv yL yR iL iR =>
@@ -822,6 +896,37 @@ theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) 
         have : Sorted yR :=
           (node yk yv yL yR).Sorted_implies_right_Sorted (by simp) st
         simp_all [last_to]
+
+theorem last_to_closest_lt (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    t.last_to (memNoNil t x mx) x < x → ∀ y ∈ t, y < t.last_to (memNoNil t x mx) x ∨ x < y := by
+  let k := t.last_to (memNoNil t x mx) x
+  -- have hk : k = t.last_to (memNoNil t x mx) x := rfl
+  -- rw [←hk] at *
+  intro h
+  induction t with
+  | nil => contradiction
+  | node yk yv yL yR iL iR =>
+    if x_eq_yk : x = yk then
+      have : (node yk yv yL yR).last_to (memNoNil (node yk yv yL yR) x mx) x = x := by simp_all [last_to]
+      order
+    else if x_vs_yk : x < yk then
+      have := (node yk yv yL yR).mem_lt_key_implies_mem_left st x mx
+      have mxL : x ∈ yL := by simp_all
+      if nyL : yL = .nil then
+        sorry
+      else
+        have : Sorted yL := (node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st
+        simp_all [last_to]
+        sorry
+    else
+      have := (node yk yv yL yR).mem_gt_key_implies_mem_right st x mx
+      have mxR : x ∈ yR := by simp_all
+      if nyR : yR = .nil then
+        sorry
+      else
+        have : Sorted yR := (node yk yv yL yR).Sorted_implies_right_Sorted (by simp) st
+        simp_all [last_to]
+        sorry
 
 def search (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
   match ht : t with
@@ -859,7 +964,24 @@ def insert (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) : SplayMap �
 
 theorem insert_preserves_sorted (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) :
     Sorted (t.insert st xk xv) := by
-  sorry
+  have st' : Sorted (t.search st xk) := t.search_preserves_sorted st xk
+  match ht' : t.search st xk with
+  | nil => simp_all [insert]
+  | node k v L R =>
+    simp_all [insert, Sorted]
+    match st' with
+    | .node _ _ _ _ gt_L lt_R sL sR =>
+      aesop
+      · exact .node xk xv L R gt_L lt_R sL sR
+      · have xk_lt_R : ∀ y ∈ R, xk < y := by
+          intro y myR
+          exact lt_trans h_1 (lt_R y myR)
+        have xk_gt_kvL : ∀ y ∈ node k v L nil, y < xk := by
+          intro y myL
+          simp_all
+          sorry
+        exact .node xk xv (node k v L nil) R (by simp_all) xk_lt_R (.node k v L nil gt_L (by simp) sL Sorted.nil) sR
+      · sorry
 
 def fromList : List (α × β) → SplayMap α β
   | [] => nil

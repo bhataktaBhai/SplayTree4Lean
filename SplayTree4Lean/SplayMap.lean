@@ -720,23 +720,64 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
 theorem splayButOne_location (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
    ((t.splayButOne st x mx).locationOf x).1 ≠ none := by sorry
 
+theorem splayButOne_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    ∀ y, y ∈ t ↔ y ∈ t.splayButOne st x mx := by
+  sorry
+
+omit [DecidableEq α] [DecidableEq β] in
+theorem sorted_unfold (yk : α) (yv : β) (yL yR : SplayMap α β) :
+    Forall (fun k => k < yk) yL → Forall (fun k => yk < k) yR → Sorted yL → Sorted yR →
+    Sorted (node yk yv yL yR) := by
+  intro h1 h2 sL sR
+  exact Sorted.node yk yv yL yR h1 h2 sL sR
+
 theorem splayButOne_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     Sorted (t.splayButOne st x mx) := by
   induction t with
   | nil => contradiction
   | node yk yv yL yR iL iR =>
+    have nt : node yk yv yL yR ≠ nil := by simp only [ne_eq, reduceCtorEq, not_false_eq_true]
     if x = yk then
       simp_all [splayButOne]
-    else if x < yk then
-      -- rw [splayButOne]
-      simp_all [splayButOne]
+    else if h : x < yk then
+      rw [splayButOne]
       split
-      · have mxL : x ∈ yL := sorry
-        simp_all! [splayButOne]
-        sorry
-      · sorry
-      sorry
-      sorry
+      · rename_i h_2
+        subst h_2
+        simp_all only [instSplayMapMem, splayMem, true_or, not_true_eq_false]
+      · have m_x_yL : x ∈ yL := mem_lt_key_implies_mem_left (node yk yv yL yR) st x mx h
+        let yL' := yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x m_x_yL
+        match hyL' : yL'.locationOf x with
+        | (Location.root, ⟨P, p⟩) =>
+          have hyL_to_yL' : yL.Sorted → yL'.Sorted := by
+            intro a
+            simp_all only [yL']
+          have syL : yL.Sorted := Sorted_implies_left_Sorted (node yk yv yL yR) (by simp) st
+          have syL' : yL'.Sorted := hyL_to_yL' syL
+          have hltR : Forall (fun k ↦ yk < k) yR := match st with
+            | .node _ _ _ _ biggerL smallerR sL sR => smallerR
+          have syR : Sorted yR := match st with
+            | .node _ _ _ _ biggerL smallerR sL sR => sR
+          have hgtL : Forall (fun k ↦ k < yk) yL := match st with
+            | .node _ _ _ _ biggerL smallerLR s sR => biggerL
+          have hgtL' : Forall (fun k ↦ k < yk) yL' := by
+            intro yl' m_yl'_yL'
+            have m_yl'_yL : yl' ∈ yL := (splayButOne_preserves_membership yL syL x m_x_yL yl').mpr m_yl'_yL'
+            exact hgtL yl' m_yl'_yL
+          have sNew : (node yk yv yL' yR).Sorted := by
+            apply sorted_unfold
+            · exact hgtL'
+            · exact hltR
+            · exact syL'
+            · exact syR
+          aesop
+        | (Location.left, ⟨P, p⟩) =>
+          sorry
+        | (Location.right, ⟨P, p⟩) =>
+          sorry
+        | (none, ⟨P, p⟩) =>
+          sorry
+
     else
       sorry
 

@@ -92,35 +92,51 @@ omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 lemma key_list_empty_iff : ∀ t : SplayMap α β, t.keyList = [] ↔ t = nil := by
   simp [keyList, list_empty_iff]
 
-def max? (t : SplayMap α β) : Option α :=
-  t.keyList.max?
+-- def max? (t : SplayMap α β) : Option α :=
+--   t.keyList.max?
 
-def min? (t : SplayMap α β) : Option α :=
-  t.keyList.min?
+-- def min? (t : SplayMap α β) : Option α :=
+--   t.keyList.min?
 
-def max (t : SplayMap α β) (h : t ≠ nil) : α :=
-  match h' : max? t with
-  | some k => k
-  | none   => by
-    have h_empty : t.keyList = [] := List.max?_eq_none_iff.mp h'
-    have h_nil : t = nil := (key_list_empty_iff t).mp h_empty
-    contradiction
+-- omit [DecidableEq α] [DecidableEq β] in
+-- lemma max?_eq_none_iff : ∀ t : SplayMap α β, t.max? = none ↔ t = nil := by
+--   intro t
+--   apply Iff.intro <;> intro h
+--   · have h_empty : t.keyList = [] := List.max?_eq_none_iff.mp h
+--     exact (key_list_empty_iff t).mp h_empty
+--   · simp [max?, h, key_list_empty_iff]
 
-def min (t : SplayMap α β) (h : t ≠ nil) : α :=
-  match h' : min? t with
-  | some k => k
-  | none   => by
-    have h_empty : t.keyList = [] := List.min?_eq_none_iff.mp h'
-    have h_nil : t = nil := (key_list_empty_iff t).mp h_empty
-    contradiction
+-- omit [DecidableEq α] [DecidableEq β] in
+-- lemma min?_eq_none_iff : ∀ t : SplayMap α β, t.min? = none ↔ t = nil := by
+--   intro t
+--   apply Iff.intro <;> intro h
+--   · have h_empty : t.keyList = [] := List.min?_eq_none_iff.mp h
+--     exact (key_list_empty_iff t).mp h_empty
+--   · simp [min?, h, key_list_empty_iff]
 
-def is_sorted : SplayMap α β → Prop
-  | nil => True
-  | node k _ left right =>
-      (match max? left with | some m => m ≤ k | none => True)
-      ∧ (match min? right with | some m => k < m | none => True)
-      ∧ is_sorted left
-      ∧ is_sorted right
+-- def max_ (t : SplayMap α β) (h : t ≠ nil) : α :=
+--   match h' : t.max? with
+--   | some k => k
+--   | none   => by simp_all only [max?_eq_none_iff]
+
+-- theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
+--     (t.max h) ∈ t := by
+--   match h' : t.max? with
+--   | some k =>
+--     simp_all!
+--     split
+--     · rename_i k' heq
+--       rw [(List.max?_eq_some_iff' (h1 : )).mp] at heq  
+--       sorry
+--       sorry
+--     · trivial
+--   | none   => simp_all only [max?_eq_none_iff]
+-- #check List.max?_eq_some_iff'
+
+-- def min_ (t : SplayMap α β) (h : t ≠ nil) : α :=
+--   match h' : min? t with
+--   | some k => k
+--   | none   => by simp_all only [min?_eq_none_iff]
 
 -- TODO: is the below useful?
 -- inductive Forall (p : α → β → Prop) : SplayMap α β → Prop
@@ -158,6 +174,24 @@ def left (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
 def right (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
   | node _ _ _ right => right
 
+def size : SplayMap α β → Nat
+  | SplayMap.nil => 0
+  | SplayMap.node _ _ l r => 1 + l.size + r.size
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma size_mono_left (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.left h).size :=
+  match ht : t with
+  | node k v l r => by
+    rw [size, left]
+    omega
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.right h).size :=
+  match t with
+  | node k v l r => by
+    rw [size, right]
+    omega
+
 /-- Rotates the edge joining the supplied node and its left child, if it exists. -/
 def rotateLeftChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) : SplayMap α β :=
   match t with
@@ -169,22 +203,6 @@ def rotateRightChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.right h1 ≠ 
   match t with
   | node yk yv yL (node yrk yrV yRL yRR) =>
     node yrk yrV (node yk yv yL yRL) yRR
-
-omit [DecidableEq α] [DecidableEq β] in
-theorem sorted_implies_left_sorted (t : SplayMap α β) (h : t ≠ nil) :
-    t.is_sorted → (t.left h).is_sorted :=
-  match ht : t with
-  | node yk yv yL yR => by
-    intro h'
-    exact h'.2.2.1
-
-omit [DecidableEq α] [DecidableEq β] in
-theorem sorted_implies_right_sorted (t : SplayMap α β) (h : t ≠ nil) :
-    t.is_sorted → (t.right h).is_sorted :=
-  match t with
-  | node yk yv yL yR => by
-    intro h'
-    exact h'.2.2.2
 
 omit [DecidableEq α] [DecidableEq β] in
 @[simp]
@@ -205,6 +223,22 @@ theorem Sorted_implies_right_Sorted (t : SplayMap α β) (h : t ≠ nil) :
   | node yk yv yL yR, .node _ _ _ _ biggerL smallerR sL sR =>
     simp [right]
     exact sR
+
+def max (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
+  if nR : t.right nt = nil then
+    t.key nt
+  else
+    (t.right nt).max (t.Sorted_implies_right_Sorted nt st) nR
+termination_by t.size
+decreasing_by (exact size_mono_right t nt)
+
+def min (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
+  if nL : t.left nt = nil then
+    t.key nt
+  else
+    (t.left nt).min (t.Sorted_implies_left_Sorted nt st) nL
+termination_by t.size
+decreasing_by (exact size_mono_left t nt)
 
 omit [DecidableEq α] [DecidableEq β] in
 theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
@@ -277,24 +311,6 @@ theorem Sorted_implies_rotateRight_Sorted (t : SplayMap α β) (nt : t ≠ nil) 
         | inr h_in =>
           simp_all only [ne_eq, true_and, instSplayMapMem, Forall]
     exact .node yrk yrv (node yk yv yL yRL) yRR yrk_bigger_left yrk_smaller_yRR snewL sRR
-
-def size : SplayMap α β → Nat
-  | SplayMap.nil => 0
-  | SplayMap.node _ _ l r => 1 + l.size + r.size
-
-omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma size_mono_left (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.left h).size :=
-  match ht : t with
-  | node k v l r => by
-    rw [size, left]
-    omega
-
-omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.right h).size :=
-  match t with
-  | node k v l r => by
-    rw [size, right]
-    omega
 
 -- theorem le_max_of_mem (t : SplayMap α β) (h : t ≠ nil) (x : α) (mx : x ∈ t) :
 --   x ≤ max t h := by
@@ -379,7 +395,6 @@ def atRight (t : SplayMap α β) (x : α) : Prop :=
 
 -- TODO: do we use the three above functions anywhere? should we use them in `locationOf`?
 
-
 -- theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
 --     (t.splayButOne x).locationOf x ≠ .idk := by
 --   cases t with
@@ -401,12 +416,7 @@ def atRight (t : SplayMap α β) (x : α) : Prop :=
 --       else
 --         sorry
 
-
 /- Doesn't work, needs rewriting `splay?`. -/
-
-
-theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
-    (t.max h) ∈ t := by sorry
 
 -- def delete (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
 --   let t' := t.splay x h  -- First splay the node to delete to the root
@@ -439,7 +449,6 @@ theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
 /- Builds a `SplayMap` from a `List` by inserting its elements one-by-one. -/
 -- def fromList (L : List (α × β)) : SplayMap α β :=
 --   L.foldl (fun t (xk, xv) => t.insert xk xv) nil
-/-- Return the last non-nil key on the search path to `x`. -/
 
 /--
 Looks for a value `x` in a `SplayMap`.

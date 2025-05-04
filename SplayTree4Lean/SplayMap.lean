@@ -1,6 +1,8 @@
 import Mathlib.Order.Basic -- for LinearOrder
 import Mathlib.Data.Nat.Basic -- for LinearOrder Nat
 import Mathlib.Data.Nat.MaxPowDiv -- for maxPowDiv
+import Mathlib.Tactic -- for Linarith
+import SplayTree4Lean.lemmas -- for lemmas
 
 universe u v
 variable {α : Type u} [LinearOrder α] [DecidableEq α]
@@ -32,8 +34,16 @@ instance instSplayMapMem : Membership α (SplayMap α β) :=
   ⟨splayMem⟩
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+@[simp]
 lemma noMemNil : ∀ x, x ∉ (nil : SplayMap α β) := by
   intro x h; exact h
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+lemma memNoNil : ∀ (t : SplayMap α β) x, x ∈ t → t ≠ nil := by
+  intro t x a
+  simp_all only [instSplayMapMem, ne_eq]
+  intro a1
+  simp_all
 
 /-- Returns the (key, val) pairs of the tree in order. -/
 def toList : SplayMap α β → List (α × β)
@@ -144,9 +154,11 @@ inductive Sorted : SplayMap α β → Prop
       Sorted yR →
     Sorted (node yk yv yL yR)
 
+@[simp]
 def key (t : SplayMap α β) (h : t ≠ nil) : α := match t with
   | node key _ _ _ => key -- how is Lean so smart?!
 
+@[simp]
 def value (t : SplayMap α β) (h : t ≠ nil) : β := match t with
   | node _ value _ _ => value
 
@@ -219,7 +231,7 @@ theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (
       | .node _ _ _ _ biggerLL smallerLR sLL sLR => sLR
     simp_all!
     have snewR : Sorted (node yk yv yLR yR) :=
-      .node yk yv yLR yR (by simp_all) smallerR sLR sR
+      .node yk yv yLR yR (by simp_all only [ne_eq, Forall, instSplayMapMem, or_true, implies_true]) smallerR sLR sR
     have ylk_bigger_yLL : Forall (fun k => k < ylk) yLL := match sL with
       | .node _ _ _ _ bigger_ylk smaller_ylk _ _ => bigger_ylk
     have ylk_smaller_yLR : Forall (fun k => ylk < k) yLR := match sL with
@@ -360,7 +372,7 @@ def locationOf (t : SplayMap α β) (x : α) : Option Location :=
         else none
 
 -- lemma root_means_root (t : SplayMap α β) (x : α) (lx : t.locationOf x = Location.root) :
---     t ≠ nil ∧ 
+--     t ≠ nil ∧
 
 def atRoot (t : SplayMap α β) (x : α) : Prop :=
   match t with
@@ -439,7 +451,55 @@ theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
 /- Builds a `SplayMap` from a `List` by inserting its elements one-by-one. -/
 -- def fromList (L : List (α × β)) : SplayMap α β :=
 --   L.foldl (fun t (xk, xv) => t.insert xk xv) nil
-/-- Return the last non-nil key on the search path to `x`. -/
+
+omit [DecidableEq α] [DecidableEq β] in
+lemma mem_lt_key_implies_mem_left (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    x < t.key (t.memNoNil x mx) → x ∈ t.left (t.memNoNil x mx) := by
+  match t with
+  | nil => trivial
+  | node yk yv yL yR  =>
+      intro xlt
+      simp_all only [instSplayMapMem, splayMem]
+      cases mx with
+      | inl h_eq => simp_all!
+      | inr mx' =>
+        cases mx' with
+        | inl mx'' =>
+          simp_all only [left]
+        | inr mx'' =>
+          dsimp at *
+          have h_new : Forall (fun k => yk < k) yR := match st with
+            | .node _ _ _ _ biggerL smallerR sL sR => smallerR
+          rw [Forall] at h_new
+          have nmx'' : ¬ x ∈ yR := by
+            intro mxR
+            have xgt : yk < x := h_new x mxR
+            exact lt_gt_false x yk xlt xgt
+          simp_all
+
+omit [DecidableEq α] [DecidableEq β] in
+lemma mem_gt_key_implies_mem_right (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    t.key (t.memNoNil x mx) < x → x ∈ t.right (t.memNoNil x mx) := by
+  match t with
+  | node yk yv yL yR  =>
+      intro xgt
+      simp_all only [instSplayMapMem, splayMem]
+      cases mx with
+      | inl h_eq => simp_all!
+      | inr mx' =>
+        cases mx' with
+        | inr mx'' =>
+          simp_all only [right]
+        | inl mx'' =>
+          dsimp at *
+          have h_new : Forall (fun k => k < yk) yL := match st with
+            | .node _ _ _ _ biggerL smallerR sL sR => biggerL
+          rw [Forall] at h_new
+          have nmx'' : ¬ x ∈ yL := by
+            intro mxL
+            have xlt : x < yk := h_new x mxL
+            exact lt_gt_false x yk xlt xgt
+          simp_all
 
 /--
 Looks for a value `x` in a `SplayMap`.
@@ -454,8 +514,8 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
   | node yk yv yL yR =>
       if x = yk then
         t
-      else if x < yk then
-        let yL' := yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x (sorry)
+      else if h : x < yk then
+        let yL' := yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x (mem_lt_key_implies_mem_left (node yk yv yL yR) st x mx h)
         match yL'.locationOf x with
         | Location.root => node yk yv yL' yR
         | Location.left =>

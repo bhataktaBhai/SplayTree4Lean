@@ -11,7 +11,7 @@ variable {β : Type v} [DecidableEq β]
 inductive SplayMap (α : Type u) (β : Type v)
   | nil : SplayMap α β
   | node (key : α) (val : β) (left right : SplayMap α β) : SplayMap α β
-  deriving DecidableEq
+  deriving DecidableEq, Inhabited
 
 namespace SplayMap
 
@@ -236,6 +236,17 @@ theorem Sorted_implies_right_Sorted (t : SplayMap α β) (h : t ≠ nil) :
     simp [right]
     exact sR
 
+omit [DecidableEq α] [DecidableEq β] in
+theorem Sorted_implies_left_lt_right (t : SplayMap α β) (nt : t ≠ nil) :
+    Sorted t → ∀ x y, x ∈ t.left nt → y ∈ t.right nt → x < y := by
+  intro st
+  match t, st with
+  | node k v L R, .node _ _ _ _ biggerL smallerR sL sR =>
+    intro x y mx my
+    have x_lt_k : x < k := biggerL x mx
+    have k_lt_y : k < y := smallerR y my
+    exact lt_trans x_lt_k k_lt_y
+
 def max (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
   if nR : t.right nt = nil then
     t.key nt
@@ -251,6 +262,15 @@ def min (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
     (t.left nt).min (t.Sorted_implies_left_Sorted nt st) nL
 termination_by t.size
 decreasing_by (exact size_mono_left t nt)
+
+theorem max_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) :
+    (t.max st nt) ∈ t := by
+  sorry
+  -- cases hR : t.right nt
+  -- · simp_all! [max]
+  --   rw [key]
+  -- · sorry
+#check List.max?_eq_some_iff'
 
 omit [DecidableEq α] [DecidableEq β] in
 theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
@@ -365,6 +385,7 @@ The `locationOf` function defined below returns `none` if it is at none of these
 -/
 inductive Location
   | root | left | right
+  deriving DecidableEq
 
 /-- Returns the `Location` of the supplied value in the supplied tree.
 Returns `none` if it is not in the first two levels of the tree. -/
@@ -565,6 +586,7 @@ theorem splayButOne_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x
       split
       · have mxL : x ∈ yL := sorry
         simp_all! [splayButOne]
+        sorry
       · sorry
       · sorry
       · sorry
@@ -581,31 +603,9 @@ def splay (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMa
     have : t'.locationOf x ≠ none := splayButOne_location t st x mx
     contradiction
 
-theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : x ∈ t.splay x mx := by
+theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    x ∈ t.splay st x mx := by
   sorry
-
-def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
-  let t' := t.splay st x h
-  have h' : x ∈ t' := splay_preserves_membership t st x h
-  match t' with
-  | nil => by contradiction
-  | node yk yv yL yR =>
-      if x ≤ yk then (yL, node yk yv nil yR)
-      else (node yk yv yL nil, yR)
-
-/- Joins two splay trees where all keys in A are less than all keys in B -/
-def join (A B : SplayMap α β) (sA : Sorted A) (sB : Sorted B) : SplayMap α β :=
-  match hA : A, hB : B with
-  | nil, _ => B
-  | _, nil => A
-  | A, B =>
-      -- Find and splay the max element in A
-      let maxK := A.max (by sorry)
-      let A' := A.splay sA maxK (A.max_mem (sorry))
-      -- Now max element is at root of A'
-      match A' with
-      | node k v L _ => node k v L B
-      | nil => sorry
 
 def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
   match ht : t with
@@ -653,6 +653,18 @@ theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) 
 def search (t : SplayMap α β) (x : α) : SplayMap α β :=
   sorry
 
+theorem search_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) : Sorted (t.search x) := by
+  sorry
+
+def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
+  let t' := t.splay st x h
+  have h' : x ∈ t' := splay_preserves_membership t st x h
+  match t' with
+  | nil => by contradiction
+  | node yk yv yL yR =>
+      if x ≤ yk then (yL, node yk yv nil yR)
+      else (node yk yv yL nil, yR)
+
 def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
   let t' := t.search xk
   match t' with
@@ -660,7 +672,63 @@ def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
   | node k v L R =>
     if xk = k then
       node k xv L R
+    else if xk < k then
+      node xk xv (node k v L nil) R
     else
-      sorry
+      node xk xv L (node k v nil R)
+
+def fromList : List (α × β) → SplayMap α β :=
+  List.foldr (fun (k, v) t => t.insert k v) nil
+
+/- Joins two splay trees where all keys in L are less than all keys in R -/
+def join (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R) (ord : ∀ x y, x ∈ L → y ∈ R → x < y) :
+    SplayMap α β :=
+  match hL : L, hR : R with
+  | nil, _ => R
+  | _, nil => L
+  | L, R =>
+      -- Find and splay the max element in L
+      let maxK := L.max sL (sorry)
+      let L' := L.splay sL maxK (L.max_mem sL (sorry))
+      -- Now max element is at root of L'
+      match L' with
+      | node k v L _ => node k v L R
+      | nil => sorry
+
+def delete (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
+  let t' := t.search x
+  match ht' : t' with
+  | nil => nil
+  | node k v L R => by
+    have st' : Sorted t' := t.search_preserves_sorted st x
+    rw [ht'] at st'
+    if x = k then
+      have sL : Sorted L :=
+        (node k v L R).Sorted_implies_left_Sorted (by simp) st'
+      have sR : Sorted R :=
+        (node k v L R).Sorted_implies_right_Sorted (by simp) st'
+      exact join L R sL sR ((node k v L R).Sorted_implies_left_lt_right (by simp) st')
+    else
+      exact panic! "key not found"
+
+def delete! (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
+  let t' := t.search x
+  match ht' : t' with
+  | nil => nil
+  | node k v L R => by
+    have st' : Sorted t' := t.search_preserves_sorted st x
+    rw [ht'] at st'
+    if x = k then
+      have sL : Sorted L :=
+        (node k v L R).Sorted_implies_left_Sorted (by simp) st'
+      have sR : Sorted R :=
+        (node k v L R).Sorted_implies_right_Sorted (by simp) st'
+      exact join L R sL sR ((node k v L R).Sorted_implies_left_lt_right (by simp) st')
+    else
+      exact t'
+
+theorem locationProp (t : SplayMap α β) (x : α) :
+  if t.locationOf x = Location.root then
+    t.atRoot x
 
 end SplayMap

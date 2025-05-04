@@ -3,7 +3,7 @@ import SplayTree4Lean.SplayMap
 universe u
 variable {α : Type u} [LinearOrder α]
 
-def SplayTree (α : Type u) := SplayMap α Unit -- is this the best way?
+def SplayTree (α : Type u) := SplayMap α Unit
 
 instance [DecidableEq α] : DecidableEq (SplayTree α) :=
   inferInstanceAs (DecidableEq (SplayMap α Unit))
@@ -21,7 +21,7 @@ def toStr [ToString α] (header : String) : SplayTree α → String
       where header' := header ++ "    "
 
 instance [ToString α] : ToString (SplayTree α) where
-  toString := toStr ""
+  ⟨toStr ""⟩
 
 #synth DecidableEq (SplayMap Nat Unit)
 #synth DecidableEq (SplayTree Nat)

@@ -91,60 +91,8 @@ def rotateRightChild (t : SortedMap α β) (nt : t ≠ nil) (nR : t.right nt ≠
       rfl
     simp only [nR'a, nR'b, ne_eq, not_false_eq_true, sorted_not_nil_implies]
   let t' := (t.val).rotateRightChild nt' nR'
-  have h' : t'.Sorted := t.val.Sorted_implies_rotateRight_Sorted nt' nR' t.prop
+  have h' : t'.Sorted := sorry --t.val.Sorted_implies_rotateRight_Sorted nt' nR' t.prop
   ⟨t', h'⟩
-
-/--
-Looks for a value `x` in a `SplayMap`.
-If found, splays the tree at that node, executing zig-zig and zig-zag steps
-but *not* a zig step.
-That is, if `x` ends up as a child of the root, a final rotation to bring it to
-the root is *not* performed.
-This is necessary for recursion to work in the `splay` function.
--/
-def splayButOne (t : SortedMap α β) (x : α) : SortedMap α β :=
-  match t.val with
-  | .nil => nil
-  | .node yk yv yL yR =>
-      if x = yk then
-        t
-      else if x < yk then
-        let yL' := yL.splayButOne x
-        match yL'.locationOf x with
-        | Location.root => ⟨.node yk yv yL' yR, sorry⟩
-        | Location.left =>
-          match (node yk yv yL' yR).rotateLeftChild (sorry) with
-          | t1 =>
-            match rotateLeftChild t1 with
-            | some t2 => t2
-            | none => t1
-          | none => node yk yv yL' yR
-        | Location.right =>
-          match rotateRightChild yL' with
-          | some newYl =>
-            match rotateLeftChild (node yk yv newYl yR) with
-            | some t' => t'
-            | none => node yk yv newYl yR
-          | none => node yk yv yL' yR
-        | none => sorry
-      else
-        let yR' := yR.splayButOne x
-        match yR'.locationOf x with
-        | Location.root => node yk yv yL yR'
-        | Location.right =>
-          match rotateRightChild (node yk yv yL yR') with
-          | some t1 =>
-            match rotateRightChild t1 with
-            | some t2 => t2
-            | none => t1
-          | none => node yk yv yL yR'
-        | Location.left =>
-          match rotateLeftChild yR' with
-          | some newYr =>
-            match rotateRightChild (node yk yv yL newYr) with
-            | some t' => t'
-            | none => node yk yv yL newYr
-          | none => node yk yv yL yR'
 
 -- theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
 --     (t.splayButOne x).locationOf x ≠ .idk := by

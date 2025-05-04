@@ -366,29 +366,9 @@ The `locationOf` function defined below returns `none` if it is at none of these
 inductive Location
   | root | left | right
 
-/-- Returns the `Location` of the supplied value in the supplied tree.
-Returns `none` if it is not in the first two levels of the tree. -/
-def locationOf (t : SplayMap α β) (x : α) : Option Location :=
-  match t with
-  | nil => none
-  | node yk _ yL yR =>
-    if x = yk then
-      Location.root
-    else if x < yk then
-      match yL with
-      | nil => none
-      | node ylk _ _ _ =>
-        if x = ylk then Location.left
-        else none
-    else
-      match yR with
-      | nil => none
-      | node yrk _ _ _ =>
-        if x = yrk then Location.right
-        else none
-
--- lemma root_means_root (t : SplayMap α β) (x : α) (lx : t.locationOf x = Location.root) :
---     t ≠ nil ∧
+structure Prop_Proof where
+  prop : Prop
+  proof : prop
 
 def atRoot (t : SplayMap α β) (x : α) : Prop :=
   match t with
@@ -404,6 +384,78 @@ def atRight (t : SplayMap α β) (x : α) : Prop :=
   match t with
   | node _ _ _ (node yrk _ _ _) => x = yrk
   | _ => False
+
+/-- Returns the `Location` of the supplied value in the supplied tree.
+Returns `none` if it is not in the first two levels of the tree. -/
+def locationOf (t : SplayMap α β) (x : α) : Option Location × Prop_Proof := by
+  match ht : t with
+  | nil => exact (none, ⟨True, trivial⟩)
+  | node yk yv yL yR =>
+    if h : x = yk then
+      have xr : atRoot t x := by aesop
+      exact (Location.root, ⟨atRoot t x, xr⟩)
+    else if x < yk then
+      match yL with
+      | nil => exact (none, ⟨True, trivial⟩)
+      | node ylk _ _ _ =>
+        if x = ylk then
+          have xl : atLeft t x := by aesop
+          exact (Location.left, ⟨atLeft t x, xl⟩)
+        else
+          exact (none, ⟨True, trivial⟩)
+    else
+      match yR with
+      | nil => exact (none, ⟨True, trivial⟩)
+      | node yrk _ _ _ =>
+        if x = yrk then
+          have xr : atRight t x := by aesop
+          exact (Location.right, ⟨atRight t x, xr⟩)
+        else exact (none, ⟨True, trivial⟩)
+
+omit [DecidableEq β] in
+lemma loc_left_implies_not_nil (t : SplayMap α β) (x : α) (loc : (t.locationOf x).1 = Location.left) : t ≠ nil := by
+  match t with
+  | nil => trivial
+  | node yk _ yL yR =>
+    simp
+
+omit [DecidableEq β] in
+lemma loc_right_implies_not_nil (t : SplayMap α β) (x : α) (loc : t.locationOf x = Location.right) : t ≠ nil := by
+  match t with
+  | nil => trivial
+  | node yk _ yL yR =>
+    simp
+
+lemma loc_left_implies_left_not_nil (t : SplayMap α β) (x : α) (hloc : t.locationOf x = Location.left) :
+    (t.left (loc_left_implies_not_nil t x hloc)) ≠ nil := by
+  match t with
+  | nil => trivial
+  | node yk yv yL yR =>
+    have id : t = node yk yv yL yR := by sorry
+    match w : t.locationOf x with
+    | Location.root => aesop
+    | Location.left =>
+      unfold locationOf at hloc
+      simp_all only
+
+    | Location.right =>
+      aesop
+    | none =>
+      aesop
+
+
+
+-- lemma loc_left_implies_left_not_nil (t : SplayMap α β) (x : α) (hloc : t.locationOf x = Location.left) :
+--     t.left (loc_left_implies_not_nil t x hloc) ≠ nil := by
+--   match t with
+--   | nil => trivial
+--   | node yk _ yL yR =>
+--     dsimp
+
+
+
+-- lemma root_means_root (t : SplayMap α β) (x : α) (lx : t.locationOf x = Location.root) :
+--     t ≠ nil ∧
 
 -- TODO: do we use the three above functions anywhere? should we use them in `locationOf`?
 

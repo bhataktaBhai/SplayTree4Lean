@@ -359,6 +359,9 @@ def locationOf (t : SplayMap α β) (x : α) : Option Location :=
         if x = yrk then Location.right
         else none
 
+-- lemma root_means_root (t : SplayMap α β) (x : α) (lx : t.locationOf x = Location.root) :
+--     t ≠ nil ∧ 
+
 def atRoot (t : SplayMap α β) (x : α) : Prop :=
   match t with
   | node yk _ _ _ => x = yk
@@ -400,41 +403,7 @@ def atRight (t : SplayMap α β) (x : α) : Prop :=
 
 
 /- Doesn't work, needs rewriting `splay?`. -/
-def split (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
-  let t' := t.splay x h
-  have h' : x ∈ t' := splay_preserves_membership t x h
-  match t' with
-  | nil => by contradiction
-  | node yk yv yL yR =>
-      if x ≤ yk then (yL, node yk yv nil yR)
-      else (node yk yv yL nil, yR)
 
-
-/- Joins two splay trees where all keys in A are less than all keys in B -/
--- def join (A B : SplayMap α β) : SplayMap α β :=
---   match A, B with
---   | nil, _ => B
---   | _, nil => A
---   | A, B =>
---       -- Find and splay the max element in A
---       let (maxK, maxV) := A.max (by sorry)
---       let A' := A.splay maxK (by sorry)
---       -- Now max element is at root of A'
---       match A' with
---       | node _ _ l _ => node maxK maxV l B
---       | nil => nil
-
-/- Doesn't work, needs rewriting `splay?`. -/
--- def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
---   match t.search? xk with
---   | none =>
---     let (L, R) := t.split xk (by sorry)
---     node xk xv L R
---   | some _ =>
---     let t' := t.splay xk (by sorry)
---     match t' with
---     | node _ _ l r => node xk xv l r
---     | nil => nil
 
 theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
     (t.max h) ∈ t := by sorry
@@ -481,49 +450,92 @@ the root is *not* performed.
 This is necessary for recursion to work in the `splay` function.
 -/
 def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β :=
-  match ht : t with
-  | nil => by contradiction
+  match t with
   | node yk yv yL yR =>
       if x = yk then
         t
       else if x < yk then
-        let yL' : SplayMap α β :=
-          yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x (sorry)
+        let yL' := yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x (sorry)
         match yL'.locationOf x with
         | Location.root => node yk yv yL' yR
         | Location.left =>
-          match rotateLeftChild (node yk yv yL' yR) with
-          | some t1 =>
-            match rotateLeftChild t1 with
-            | some t2 => t2
-            | none => t1
-          | none => node yk yv yL' yR
+          have : yL' ≠ nil := by sorry
+          let t' := (node yk yv yL' yR).rotateLeftChild (by simp) (sorry)
+          t'.rotateLeftChild (sorry) (sorry)
         | Location.right =>
-          match rotateRightChild yL' with
-          | some newYl =>
-            match rotateLeftChild (node yk yv newYl yR) with
-            | some t' => t'
-            | none => node yk yv newYl yR
-          | none => node yk yv yL' yR
+          let yL'' := yL'.rotateRightChild (sorry) (sorry)
+          (node yk yv yL'' yR).rotateLeftChild (sorry) (sorry)
         | none => sorry
       else
-        let yR' := yR.splayButOne x
+        let yR' := yR.splayButOne ((node yk yv yL yR).Sorted_implies_right_Sorted (by simp) st) x (sorry)
         match yR'.locationOf x with
         | Location.root => node yk yv yL yR'
         | Location.right =>
-          match rotateRightChild (node yk yv yL yR') with
-          | some t1 =>
-            match rotateRightChild t1 with
-            | some t2 => t2
-            | none => t1
-          | none => node yk yv yL yR'
+          have : yR' ≠ nil := by sorry
+          let t' := (node yk yv yL yR').rotateRightChild (by simp) (sorry)
+          t'.rotateRightChild (sorry) (sorry)
         | Location.left =>
-          match rotateLeftChild yR' with
-          | some newYr =>
-            match rotateRightChild (node yk yv yL newYr) with
-            | some t' => t'
-            | none => node yk yv yL newYr
-         | none => node yk yv yL yR'
+          let yR'' := yR'.rotateLeftChild (sorry) (sorry)
+          (node yk yv yL yR'').rotateRightChild (sorry) (sorry)
+        | none => sorry
+
+theorem splayButOne_location (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    (t.splayButOne st x mx).locationOf x ≠ none := by sorry
+
+theorem splayButOne_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    Sorted (t.splayButOne st x mx) := by
+  induction t with
+  | nil => contradiction
+  | node yk yv yL yR iL iR =>
+    if x = yk then
+      simp_all [splayButOne]
+    else if x < yk then
+      -- rw [splayButOne]
+      simp_all [splayButOne]
+      split
+      · have mxL : x ∈ yL := sorry
+        simp_all! [splayButOne]
+      · sorry
+      · sorry
+      · sorry
+    else
+      sorry
+
+def splay (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β :=
+  let t' := t.splayButOne st x mx
+  match lx : t'.locationOf x with
+  | Location.root => t'
+  | Location.left => t'.rotateLeftChild (sorry) (sorry)
+  | Location.right => t'.rotateRightChild (sorry) (sorry)
+  | none => by
+    have : t'.locationOf x ≠ none := splayButOne_location t st x mx
+    contradiction
+
+theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : x ∈ t.splay x mx := by
+  sorry
+
+def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
+  let t' := t.splay st x h
+  have h' : x ∈ t' := splay_preserves_membership t st x h
+  match t' with
+  | nil => by contradiction
+  | node yk yv yL yR =>
+      if x ≤ yk then (yL, node yk yv nil yR)
+      else (node yk yv yL nil, yR)
+
+/- Joins two splay trees where all keys in A are less than all keys in B -/
+def join (A B : SplayMap α β) (sA : Sorted A) (sB : Sorted B) : SplayMap α β :=
+  match hA : A, hB : B with
+  | nil, _ => B
+  | _, nil => A
+  | A, B =>
+      -- Find and splay the max element in A
+      let maxK := A.max (by sorry)
+      let A' := A.splay sA maxK (A.max_mem (sorry))
+      -- Now max element is at root of A'
+      match A' with
+      | node k v L _ => node k v L B
+      | nil => sorry
 
 def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
   match ht : t with
@@ -570,5 +582,15 @@ theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) 
 
 def search (t : SplayMap α β) (x : α) : SplayMap α β :=
   sorry
+
+def insert (t : SplayMap α β) (xk : α) (xv : β) : SplayMap α β :=
+  let t' := t.search xk
+  match t' with
+  | nil => nil
+  | node k v L R =>
+    if xk = k then
+      node k xv L R
+    else
+      sorry
 
 end SplayMap

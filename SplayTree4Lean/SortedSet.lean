@@ -8,11 +8,11 @@ def SortedSet (α : Type u) [LinearOrder α] := SortedMap α Unit
 /-! A formal implementation of Splay trees. These are implemented using dynamic self-balancing search trees, modified mainly by a `splay` operation, attributed to Sleator and Tardos (https://www.cs.cmu.edu/~sleator/papers/self-adjusting.pdf).
 
 API offered by this module:
-- `SortedSet α β` is a splay tree with `key`s of type `α` with a `LinearOrder` instance, and `value`s of type `β`.
-- `SortedMap.nil` is the empty tree.
-- `search` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the tree with `x` splayed to the root. Even if `x` is not in the tree, the output tree may still be modified.
-- `insert` is a function that takes a `SortedMap α β`, a key `xk : α`, a value `xv : β`, and returns the tree with `(xk, xv)` inserted. If `xk` is already in the tree, the value is updated.
-- `delete` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the tree with `x` deleted. If `x` is not in the input tree, the output tree may still be modified.
+- `SortedSet α β` is a splay tree with `key`s of type `α` with a `LinearOrder` instance.
+- `SortedSet.nil` is the empty tree.
+- `search` is a function that takes a `SortedSet α` and a key `x : α`, and returns the tree with `x` splayed to the root. Even if `x` is not in the tree, the output tree may still be modified.
+- `insert` is a function that takes a `SortedSet α`, a key `xk : α`, and returns the tree with `xk` inserted. If `xk` is already in the tree, the value is updated.
+- `delete` is a function that takes a `SortedSet α` and a key `x : α`, and returns the tree with `x` deleted. If `x` is not in the input tree, the output tree may still be modified.
  -/
 
 instance [DecidableEq α] : DecidableEq (SortedSet α) :=

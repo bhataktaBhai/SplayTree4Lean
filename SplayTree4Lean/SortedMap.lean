@@ -7,11 +7,12 @@ variable {β : Type v} [DecidableEq β]
 /-! A formal implementation of Splay maps. These are implemented using dynamic self-balancing search trees, modified mainly by a `splay` operation, attributed to Sleator and Tardos (https://www.cs.cmu.edu/~sleator/papers/self-adjusting.pdf).
 
 API offered by this module:
-- `SortedMap α β` is a splay map with `key`s of type `α` with a `LinearOrder` instance, and `value`s of type `β`.
-- `SortedMap.nil` is the empty tree.
-- `search` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the map with `x` splayed to the root. Even if `x` is not in the map, the output map may still be modified.
-- `insert` is a function that takes a `SortedMap α β`, a key `xk : α`, a value `xv : β`, and returns the map with `(xk, xv)` inserted. If `xk` is already in the map, the value is updated.
-- `delete` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the map with `x` deleted. If `x` is not in the input map, the output map may still be modified.
+- - `SortedMap α β` is a splay map with `key`s of type `α` with a `LinearOrder` instance, and `value`s of type `β`.
+- - `SortedMap.nil` is the empty tree.
+- - `get` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the map with `x` splayed to the root along with the value corresponding to `x`. Even if `x` is not in the map, the output map may still be modified.
+- - `insert` is a function that takes a `SortedMap α β`, a key `xk : α`, a value `xv : β`, and returns the map with `(xk, xv)` inserted. If `xk` is already in the map, the value is updated.
+- - `fromList` is a function that takes a list of `(key, val)` pairs and makes a SplayMap out of them.
+- - `delete` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the map with `x` deleted. If `x` is not in the input map, the output map may still be modified.
  -/
 
 def SortedMap (α : Type u) (β : Type v) [LinearOrder α] :=
@@ -26,12 +27,15 @@ open SplayMap
 def nil : SortedMap α β :=
   ⟨.nil, .nil⟩
 
+instance instSortedMapInhabited : Inhabited (SortedMap α β) :=
+  ⟨nil⟩
+
 instance instSortedMapMem : Membership α (SortedMap α β) :=
   ⟨fun t x => x ∈ t.val⟩
 
 omit [DecidableEq α] [DecidableEq β] in
 @[simp]
-theorem sorted_nil_iff (t : SortedMap α β) : t = nil ↔ t.val = .nil := by
+lemma sorted_nil_iff (t : SortedMap α β) : t = nil ↔ t.val = .nil := by
   apply Iff.intro <;> intro h
   · subst h
     rfl
@@ -40,115 +44,88 @@ theorem sorted_nil_iff (t : SortedMap α β) : t = nil ↔ t.val = .nil := by
 
 omit [DecidableEq α] [DecidableEq β] in
 @[simp]
-theorem sorted_not_nil_implies (t : SortedMap α β) : t ≠ nil → t.val ≠ .nil := by
+lemma sorted_not_nil_implies (t : SortedMap α β) : t ≠ nil → t.val ≠ .nil := by
   simp [sorted_nil_iff]
 
-def key (t : SortedMap α β) (h : t ≠ .nil) : α :=
-  t.val.key (by simp [h])
+def key (t : SortedMap α β) (nt : t ≠ .nil) : α :=
+  t.val.key (t.sorted_not_nil_implies nt)
 
-def value (t : SortedMap α β) (h : t ≠ nil) : β :=
-  t.val.value (by simp [h])
+def value (t : SortedMap α β) (nt : t ≠ nil) : β :=
+  t.val.value (t.sorted_not_nil_implies nt)
 
-def left (t : SortedMap α β) (h : t ≠ nil) : SortedMap α β :=
-  ⟨t.val.left h', Sorted_implies_left_Sorted t.val h' t.prop⟩
-    where h' : t.val ≠ .nil := by simp [h]
+def left (t : SortedMap α β) (nt : t ≠ nil) : SortedMap α β :=
+  ⟨t.val.left ntv, Sorted_implies_left_Sorted t.val ntv t.prop⟩
+    where ntv : t.val ≠ .nil := t.sorted_not_nil_implies nt
 
-def right (t : SortedMap α β) (h : t ≠ nil) : SortedMap α β :=
-  ⟨t.val.right h', Sorted_implies_right_Sorted t.val h' t.prop⟩
-    where h' : t.val ≠ .nil := by simp [h]
+def right (t : SortedMap α β) (nt : t ≠ nil) : SortedMap α β :=
+  ⟨t.val.right ntv, Sorted_implies_right_Sorted t.val ntv t.prop⟩
+    where ntv : t.val ≠ .nil := t.sorted_not_nil_implies nt
 
-def max (t : SortedMap α β) (h : t ≠ nil) : α :=
-  have h0 : t.val ≠ SplayMap.nil := by simp [h]
-  if h' : t.right h = nil then
-    t.val.key h0
+omit [DecidableEq α] [DecidableEq β] in
+@[simp]
+lemma sorted_left_not_nil_implies (t : SortedMap α β) (nt : t ≠ nil)
+    : t.left nt ≠ nil → t.val.left (t.sorted_not_nil_implies nt) ≠ .nil := by
+  intro nL
+  simp_all [sorted_not_nil_implies, left]
+
+omit [DecidableEq α] [DecidableEq β] in
+@[simp]
+lemma sorted_right_not_nil_implies (t : SortedMap α β) (nt : t ≠ nil)
+    : t.right nt ≠ nil → t.val.right (t.sorted_not_nil_implies nt) ≠ .nil := by
+  intro nR
+  simp_all [sorted_not_nil_implies, right]
+
+def max (t : SortedMap α β) (nt : t ≠ nil) : α :=
+  have ntv : t.val ≠ SplayMap.nil := t.sorted_not_nil_implies nt
+  if h' : t.right nt = nil then
+    t.val.key ntv
   else
-    (t.right h).max h'
+    (t.right nt).max h'
 termination_by t.val.size
-decreasing_by (exact size_mono_right t.val h0)
+decreasing_by (exact size_mono_right t.val ntv)
 
-def min (t : SortedMap α β) (h : t ≠ nil) : α :=
-  have h0 : t.val ≠ SplayMap.nil := by simp [h]
-  if h' : (t.left h) = nil then
-    t.val.key h0
+def min (t : SortedMap α β) (nt : t ≠ nil) : α :=
+  have ntv : t.val ≠ SplayMap.nil := t.sorted_not_nil_implies nt
+  if h' : t.left nt = nil then
+    t.val.key ntv
   else
-    (t.left h).min h'
+    (t.left nt).min h'
 termination_by t.val.size
-decreasing_by (exact size_mono_left t.val h0)
-
-example (n : ℕ) : n + 1 > n := by
-  induction n with
-  | zero => trivial
-  | succ n => simp
+decreasing_by (exact size_mono_left t.val ntv)
 
 def rotateLeftChild (t : SortedMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) : SortedMap α β :=
-  have nt' : t.val ≠ SplayMap.nil := by simp [nt]
-  have nL' : (t.val).left nt' ≠ SplayMap.nil := by
-    have nL'a : (t.left nt) ≠ nil := by simp [nL]
-    have nL'b : (t.val).left nt' = (t.left nt).val := by
-      simp_all only [ne_eq, not_false_eq_true]
-      rfl
-    simp only [nL'a, nL'b, ne_eq, not_false_eq_true, sorted_not_nil_implies]
+  have nt' : t.val ≠ SplayMap.nil := t.sorted_not_nil_implies nt
+  have nL' : (t.val).left nt' ≠ SplayMap.nil := t.sorted_left_not_nil_implies nt nL
   let t' := (t.val).rotateLeftChild nt' nL'
-  have h' : t'.Sorted := t.val.Sorted_implies_rotateLeft_Sorted nt' nL' t.prop
+  have h' := t.val.Sorted_implies_rotateLeft_Sorted nt' nL' t.prop
   ⟨t', h'⟩
 
-def rotateRightChild (t : SortedMap α β) (nt : t ≠ nil) (nR : t.right nt ≠ nil) : SortedMap α β :=
-  have nt' : t.val ≠ SplayMap.nil := by simp [nt]
-  have nR' : (t.val).right nt' ≠ SplayMap.nil := by
-    have nR'a : (t.right nt) ≠ nil := by simp [nR]
-    have nR'b : (t.val).right nt' = (t.right nt).val := by
-      simp_all only [ne_eq, not_false_eq_true]
-      rfl
-    simp only [nR'a, nR'b, ne_eq, not_false_eq_true, sorted_not_nil_implies]
-  let t' := (t.val).rotateRightChild nt' nR'
-  have h' : t'.Sorted := sorry --t.val.Sorted_implies_rotateRight_Sorted nt' nR' t.prop
+def rotateRightChild (t : SortedMap α β) (nt : t ≠ nil) (nL : t.right nt ≠ nil) : SortedMap α β :=
+  have nt' : t.val ≠ SplayMap.nil := t.sorted_not_nil_implies nt
+  have nL' : (t.val).right nt' ≠ SplayMap.nil := t.sorted_right_not_nil_implies nt nL
+  let t' := (t.val).rotateRightChild nt' nL'
+  have h' := t.val.Sorted_implies_rotateRight_Sorted nt' nL' t.prop
   ⟨t', h'⟩
 
--- theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
---     (t.splayButOne x).locationOf x ≠ .idk := by
---   cases t with
---   | nil =>
---       absurd h
---       exact noMemNil x
---   | node yk yv yL yR =>
---       if h₁ : x = yk then
---         subst h₁
---         have h' : (node x yv yL yR).locationOf x = .root := by
---           simp_all!
---         intro h''
---         have p : Location.root ≠ Location.idk := by
---           intro q
---           trivial
---         simp_all!
---       else if x < yk then
---         sorry
---       else
---         sorry
+-- def search (t : SortedMap α β) (x : α) : SortedMap α β :=
+--   match ht : t with
+--   | nil => nil
+--   | _ => t.splay x (x ∈ t)
 
-/-
-Looks for a value `x` in a `SplayMap`.
-If found, splays the tree at that node.
--/
-def splay (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
-  let t' := t.splayButOne x
-  let loc := t'.locationOf x
-  have h' : loc ≠ .idk := splayButOneMemberLocation t x h
-  match loc with
-  | .root => t
-  | .left => rotateLeftChild t
-  | .right => rotateRightChild t
-  | .idk => by trivial
+def insert (t : SortedMap α β) (xk : α) (xv : β) : SortedMap α β :=
+  ⟨t.val.insert t.prop xk xv, t.val.insert_preserves_sorted t.prop xk xv⟩
 
-def last_to? (t : SortedMap α β) (x : α) : Option α :=
-  match ht : t with
-  | ⟨.nil, _⟩ => none
-  | ⟨node yk yv yL yR, p⟩ =>
-    some (last_to ⟨node yk yv yL yR, p⟩ (by simp_all) x)
+def fromList : List (α × β) → SortedMap α β :=
+  List.foldr (fun (xk, xv) t => t.insert xk xv) nil
 
-def search (t : SortedMap α β) (x : α) : SortedMap α β :=
-  match ht : t with
-  | nil => nil
-  | _ => t.splay x (x ∈ t)
+def delete (t : SortedMap α β) (xk : α) : SortedMap α β :=
+  ⟨t.val.delete t.prop xk, t.val.delete_preserves_sorted t.prop xk⟩
+
+def delete! (t : SortedMap α β) (xk : α) : SortedMap α β :=
+  ⟨t.val.delete! t.prop xk, t.val.delete!_preserves_sorted t.prop xk⟩
+
+def get (t : SortedMap α β) (x : α) (mx : x ∈ t) : SortedMap α β × β :=
+  (⟨(t.val.get t.prop x mx).1, t.val.get_preserves_sorted t.prop x mx⟩, (t.val.get t.prop x mx).2)
 
 end SortedMap
 
@@ -156,4 +133,5 @@ def five? : Option Nat := Option.some 5
 #check five?
 
 #eval five?.get!
+-- #eval (none : Option (SortedMap Nat Nat)).get!
 #eval (2, 3).1

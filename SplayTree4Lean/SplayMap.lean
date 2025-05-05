@@ -844,10 +844,11 @@ def splay (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMa
 
 /-- The output of `splay` is a sorted `SplayMap`. -/
 theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
-    x ∈ t.splay st x mx := by
-  have mxsbo : x ∈ t.splayButOne st x mx :=
-    (splayButOne_preserves_membership t st x mx x).mp mx
-  match t'lx : (t.splayButOne st x mx).locationOf x with
+    ∀ y ∈ t, y ∈ t.splay st x mx := by
+  intro y my
+  have mxsbo : y ∈ t.splayButOne st x mx :=
+    (splayButOne_preserves_membership t st x mx y).mp my
+  match t'ly : (t.splayButOne st x mx).locationOf x with
   | .root _ =>
     rw [splay]
     split <;> simp_all
@@ -878,6 +879,16 @@ theorem splay_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx
   | .none =>
     have := splayButOne_location t st x mx
     simp_all
+
+theorem splay_preserves_not_nil (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    t.splay st x mx ≠ nil := by
+  intro nt'
+  have : x ∈ t.splay st x mx := t.splay_preserves_membership st x mx x mx
+  simp_all [noMemNil]
+
+theorem splay_top (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    (t.splay st x mx).key (t.splay_preserves_not_nil st x mx) = x := by
+  sorry
 
 /-- Performs a search for `x` on the `SplayMap t` by using the BST structure, and returns the element found in the process. -/
 def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
@@ -988,20 +999,71 @@ def search (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
     rw [←ht] at st
     exact t.splay st (t.last_to nt x) (last_to_mem t nt x)
 
+lemma search_preserves_not_nil (t : SplayMap α β) (st : Sorted t) (x : α) :
+    t ≠ nil → t.search st x ≠ .nil := by
+  intro nt
+  match ht : t with
+  | node yk yv yL yR => simp_all [search, splay_preserves_not_nil]
+
+lemma search_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) :
+    ∀ y ∈ t, y ∈ t.search st x := by
+  intro y my
+  match ht : t with
+  | node yk yv yL yR => simp_all [search, splay_preserves_membership]
+
 /-- `search` does not alter the set of members in a SplayMap. -/
 theorem search_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) : Sorted (t.search st x) := by
   match ht : t with
   | nil => simp_all [search]
   | node yk yv yL yR => simp_all [search, splay_preserves_sorted]
 
-def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
-  let t' := t.splay st x h
-  have h' : x ∈ t' := splay_preserves_membership t st x h
-  match t' with
-  | nil => by contradiction
+theorem search_top (t : SplayMap α β) (st : Sorted t) (x : α) (nt : t ≠ nil) :
+    (t.search st x).key (t.search_preserves_not_nil st x nt) = t.last_to nt x := by
+  match ht : t with
   | node yk yv yL yR =>
-      if x ≤ yk then (yL, node yk yv nil yR)
-      else (node yk yv yL nil, yR)
+    simp_all [search, splay_top]
+    sorry
+
+lemma search_top_mem (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    (t.search st x).key (t.search_preserves_not_nil st x (memNoNil t x mx)) = x := by
+  have ltx_eq_x : t.last_to (memNoNil t x mx) x = x := t.last_to_eq_if_mem st x mx
+  rw [search_top t st x (memNoNil t x mx)]
+  assumption
+
+def get (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β × β :=
+  let t' := t.search st x
+  have nt : t ≠ nil := memNoNil t x mx
+  have nt' : t' ≠ nil := t.search_preserves_not_nil st x nt
+  have hx : t'.key nt' = x := t.search_top_mem st x mx
+  match ht' : t' with
+  | nil => by contradiction
+  | node k v _ _ =>
+    if hx' : x = k then
+      have st' : Sorted t' := t.search_preserves_sorted st x
+      (t', v)
+    else by
+      simp_all
+
+theorem get_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+    Sorted ((t.get st x mx).1) := by
+  simp_all [get]
+  split
+  · contradiction
+  · rename_i k _ _ _ _ _ _ _ heq _ _
+    simp
+    have hx' : x = k := by simp_all
+    rw [hx']
+    rw [←heq]
+    exact t.search_preserves_sorted st x
+
+-- def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
+--   let t' := t.splay st x h
+--   have h' : x ∈ t' := splay_preserves_membership t st x h
+--   match t' with
+--   | nil => by contradiction
+--   | node yk yv yL yR =>
+--       if x ≤ yk then (yL, node yk yv nil yR)
+--       else (node yk yv yL nil, yR)
 
 /-- Inserts `(xk, xv)` into the search map. If `xk` is already present as a key, then the stored value is altered. In either case, the search map is altered. -/
 def insert (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) : SplayMap α β :=
@@ -1067,6 +1129,18 @@ def join (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R) (ord : ∀ x y, 
       | node k v L _ => node k v L R
       | nil => sorry
 
+theorem join_preserves_sorted (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R)
+    (ord : ∀ x y, x ∈ L → y ∈ R → x < y) : Sorted (join L R sL sR ord) := by
+  match hL : L, hR : R with
+  | nil, _ => simp_all [join, Sorted_implies_right_Sorted]
+  | node Ll Lv LL LR, nil => simp_all [join, Sorted_implies_left_Sorted]
+  | node Ll Lv LL LR, node Rl Rv RL RR =>
+    simp_all [join, Sorted_implies_left_Sorted, Sorted_implies_right_Sorted]
+    split
+    · simp_all [splay_preserves_sorted]
+      sorry
+    · sorry
+
 /-- Tries to find the key `x` in map, and deletes it and the corresponding value it if found. Returns an error if `x` is not a key already. -/
 def delete (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
   let t' := t.search st x
@@ -1100,5 +1174,23 @@ def delete! (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
       exact join L R sL sR ((node k v L R).Sorted_implies_left_lt_right (by simp) st')
     else
       exact t'
+
+theorem delete_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) : Sorted (t.delete st x) := by
+  simp_all [delete]
+  split
+  · exact Sorted.nil
+  · split
+    · simp_all [search_preserves_sorted, join_preserves_sorted]
+    · exact Sorted.nil
+
+theorem delete!_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) : Sorted (t.delete! st x) := by
+  simp_all [delete!]
+  split
+  · exact Sorted.nil
+  · split
+    · simp_all [search_preserves_sorted, join_preserves_sorted]
+    · rename_i heq h
+      rw [←heq]
+      exact search_preserves_sorted t st x
 
 end SplayMap

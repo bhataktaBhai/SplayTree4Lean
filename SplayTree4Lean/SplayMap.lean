@@ -968,6 +968,7 @@ lemma search_top_mem (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t
   rw [search_top t st x (memNoNil t x mx)]
   assumption
 
+/-- Returns the value associated with `x` in the `SplayMap t`. -/
 def get (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β × β :=
   let t' := t.search st x
   have nt : t ≠ nil := memNoNil t x mx
@@ -994,14 +995,6 @@ theorem get_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx :
     rw [←heq]
     exact t.search_preserves_sorted st x
 
--- def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap α β × SplayMap α β :=
---   let t' := t.splay st x h
---   have h' : x ∈ t' := splay_preserves_membership t st x h
---   match t' with
---   | nil => by contradiction
---   | node yk yv yL yR =>
---       if x ≤ yk then (yL, node yk yv nil yR)
---       else (node yk yv yL nil, yR)
 
 /-- Inserts `(xk, xv)` into the search map. If `xk` is already present as a key, then the stored value is altered. In either case, the search map is altered. -/
 def insert (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) : SplayMap α β :=
@@ -1037,18 +1030,6 @@ theorem insert_preserves_sorted (t : SplayMap α β) (st : Sorted t) (xk : α) (
           sorry
         exact .node xk xv (node k v L nil) R (by simp_all) xk_lt_R (.node k v L nil gt_L (by simp) sL Sorted.nil) sR
       · sorry
-
-/-- Takes a list of `(key, val)` pairs and makes a SplayMap out of them. -/
-def fromList : List (α × β) → SplayMap α β
-  | [] => nil
-  | (xk, xv)::ls =>
-      let t := fromList ls
-      t.insert (sorry) xk xv
-  -- intro ls
-  -- have h : Sorted (nil : SplayMap α β) := Sorted.nil
-  -- let tst := List.foldr (fun (k, v) (t, st) => (t.insert st k v, insert_preserves_sorted t st k v))
-  --                     (nil, h) ls
-  -- exact Prod.fst tst
 
 /- Joins two `splayMap`s `L`, `R` where all keys in `L` are less than all keys in `R`. -/
 def join (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R) (ord : ∀ x y, x ∈ L → y ∈ R → x < y) :

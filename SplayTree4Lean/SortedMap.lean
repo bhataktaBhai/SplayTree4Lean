@@ -9,6 +9,7 @@ variable {β : Type v} [DecidableEq β]
 API offered by this module:
 - - `SortedMap α β` is a splay map with `key`s of type `α` with a `LinearOrder` instance, and `value`s of type `β`.
 - - `SortedMap.nil` is the empty tree.
+- - `toList` is a function that takes a `SortedMap α β` and returns the `(key, val)` pairs of the map in order.
 - - `get` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the map with `x` splayed to the root along with the value corresponding to `x`. Even if `x` is not in the map, the output map may still be modified.
 - - `insert` is a function that takes a `SortedMap α β`, a key `xk : α`, a value `xv : β`, and returns the map with `(xk, xv)` inserted. If `xk` is already in the map, the value is updated.
 - - `fromList` is a function that takes a list of `(key, val)` pairs and makes a SplayMap out of them.
@@ -93,45 +94,29 @@ def min (t : SortedMap α β) (nt : t ≠ nil) : α :=
 termination_by t.val.size
 decreasing_by (exact size_mono_left t.val ntv)
 
-def rotateLeftChild (t : SortedMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) : SortedMap α β :=
-  have nt' : t.val ≠ SplayMap.nil := t.sorted_not_nil_implies nt
-  have nL' : (t.val).left nt' ≠ SplayMap.nil := t.sorted_left_not_nil_implies nt nL
-  let t' := (t.val).rotateLeftChild nt' nL'
-  have h' := t.val.Sorted_implies_rotateLeft_Sorted nt' nL' t.prop
-  ⟨t', h'⟩
+/-- Returns the `(key, val)` pairs of the map in order. -/
+def toList (t : SortedMap α β) : List (α × β) :=
+  t.val.toList
 
-def rotateRightChild (t : SortedMap α β) (nt : t ≠ nil) (nL : t.right nt ≠ nil) : SortedMap α β :=
-  have nt' : t.val ≠ SplayMap.nil := t.sorted_not_nil_implies nt
-  have nL' : (t.val).right nt' ≠ SplayMap.nil := t.sorted_right_not_nil_implies nt nL
-  let t' := (t.val).rotateRightChild nt' nL'
-  have h' := t.val.Sorted_implies_rotateRight_Sorted nt' nL' t.prop
-  ⟨t', h'⟩
-
--- def search (t : SortedMap α β) (x : α) : SortedMap α β :=
---   match ht : t with
---   | nil => nil
---   | _ => t.splay x (x ∈ t)
-
+/-- Inserts `(xk, xv)` into the search map. If `xk` is already present as a key, then the stored value is altered. In either case, the search map is altered. -/
 def insert (t : SortedMap α β) (xk : α) (xv : β) : SortedMap α β :=
   ⟨t.val.insert t.prop xk xv, t.val.insert_preserves_sorted t.prop xk xv⟩
 
+/-- Takes a list of `(key, val)` pairs and makes a `SortedMap` out of them. -/
 def fromList : List (α × β) → SortedMap α β :=
   List.foldr (fun (xk, xv) t => t.insert xk xv) nil
 
+/-- Tries to find the key `x` in map, and deletes it and the corresponding value it if found. Returns an error if `x` is not a key already. -/
 def delete (t : SortedMap α β) (xk : α) : SortedMap α β :=
   ⟨t.val.delete t.prop xk, t.val.delete_preserves_sorted t.prop xk⟩
 
+/-- Tries to find `x` in the map, and deletes it if found. Does not delete anything if `x` is not found, but alters the tree in the search process nonetheless. -/
 def delete! (t : SortedMap α β) (xk : α) : SortedMap α β :=
   ⟨t.val.delete! t.prop xk, t.val.delete!_preserves_sorted t.prop xk⟩
 
+/-- Returns the value associated with a member `x` in the map.
+Also returns the modified tree. -/
 def get (t : SortedMap α β) (x : α) (mx : x ∈ t) : SortedMap α β × β :=
   (⟨(t.val.get t.prop x mx).1, t.val.get_preserves_sorted t.prop x mx⟩, (t.val.get t.prop x mx).2)
 
 end SortedMap
-
-def five? : Option Nat := Option.some 5
-#check five?
-
-#eval five?.get!
--- #eval (none : Option (SortedMap Nat Nat)).get!
-#eval (2, 3).1

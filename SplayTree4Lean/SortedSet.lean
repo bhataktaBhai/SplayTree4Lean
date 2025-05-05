@@ -3,6 +3,8 @@ import SplayTree4Lean.SortedMap
 universe u
 variable {α : Type u} [LinearOrder α]
 
+def SortedSet (α : Type u) [LinearOrder α] := SortedMap α Unit
+
 /-! A formal implementation of Splay trees. These are implemented using dynamic self-balancing search trees, modified mainly by a `splay` operation, attributed to Sleator and Tardos (https://www.cs.cmu.edu/~sleator/papers/self-adjusting.pdf).
 
 API offered by this module:
@@ -13,10 +15,8 @@ API offered by this module:
 - `delete` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the tree with `x` deleted. If `x` is not in the input tree, the output tree may still be modified.
  -/
 
-def SortedSet (α : Type u) := SortedMap α Unit
-
 instance [DecidableEq α] : DecidableEq (SortedSet α) :=
-  inferInstanceAs (DecidableEq (SplayMap α Unit))
+  inferInstanceAs (DecidableEq (SortedMap α Unit))
 
 namespace SortedSet
 
@@ -25,31 +25,34 @@ def nil : SortedSet α :=
 -- def node (xk : α) : SortedSet α → SortedSet α → SortedSet α :=
 --   SortedMap.node xk .unit
 
-def toStr [ToString α] (header : String) : SortedSet α → String
-  | ⟨SplayMap.nil, _⟩ => header ++ "nil\n"
-  | ⟨SplayMap.node yk _ yL yR, _⟩ => header ++ toString yk ++ "\n" ++ toStr header' yL ++ toStr header' yR
+def toStr' [ToString α] (header : String) : SplayMap α Unit → String
+  | .nil => header ++ "nil\n"
+  | .node yk _ yL yR => header ++ toString yk ++ "\n" ++ toStr' header' yL ++ toStr' header' yR
       where header' := header ++ "    "
+
+def toStr [ToString α] (header : String) : SortedSet α → String
+  | ⟨t, _⟩ => toStr' header t
 
 instance [ToString α] : ToString (SortedSet α) :=
   ⟨toStr ""⟩
 
 instance instSortedSetMem : Membership α (SortedSet α) :=
-  inferInstanceAs (Membership α (SplayMap α Unit))
+  inferInstanceAs (Membership α (SortedMap α Unit))
 
 #synth DecidableEq (SortedMap Nat Unit)
 #synth DecidableEq (SortedSet Nat)
 
 def insert (t : SortedSet α) (xk : α) : SortedSet α :=
-  SplayMap.insert t xk Unit.unit
+  SortedMap.insert t xk Unit.unit
 
 def delete : SortedSet α → α → SortedSet α :=
-  SplayMap.delete
+  SortedMap.delete
 
 def fromList : List α → SortedSet α :=
-  SplayMap.fromList ∘ List.map (fun x => (x, Unit.unit))
+  SortedMap.fromList ∘ List.map (fun x => (x, Unit.unit))
 
 def toList : SortedSet α → List α :=
-  List.map (fun (x, _) => x) ∘ SplayMap.toList
+  List.map (fun (x, _) => x) ∘ SortedMap.toList
 
 end SortedSet
 
@@ -65,8 +68,9 @@ def L : List Nat := [5, 3, 8, 1, 4, 7, 9]
 def exampleTree2 : SortedSet Nat :=
   fromList L
 
-#eval exampleTree1
-#eval exampleTree2
+#eval! nil.insert 15
+#eval! exampleTree1
+#eval! exampleTree2
 #eval find exampleTree1 15
 #eval find exampleTree1 5
 #eval delete exampleTree1 5

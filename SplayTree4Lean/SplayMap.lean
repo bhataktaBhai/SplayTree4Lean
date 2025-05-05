@@ -8,6 +8,12 @@ universe u v
 variable {α : Type u} [LinearOrder α] [DecidableEq α]
 variable {β : Type v} [DecidableEq β]
 
+/-! This module develops most of the groundwork required to implement Splay maps. Not meant for external use. -/
+
+/-- A binary search tree (BST) map, allowing for just a right or left child to exist without the other. Not meant for the user; will be provided in a `SortedMap` wrapper. Such a map may not have its `key`s sorted.
+
+Since the map is designed to be used as a search tree, a `LinearOrder` is imposed on the keys.
+ -/
 inductive SplayMap (α : Type u) (β : Type v)
   | nil : SplayMap α β
   | node (key : α) (val : β) (left right : SplayMap α β) : SplayMap α β
@@ -15,14 +21,16 @@ inductive SplayMap (α : Type u) (β : Type v)
 
 namespace SplayMap
 
-def toStr [ToString α] [ToString β] (header : String) : SplayMap α β → String
+/-- Custom representation of a BST map for Lean Infoview. Best used with small maps. -/
+def toString [ToString α] [ToString β] (header : String) : SplayMap α β → String
   | nil => header ++ "nil\n"
-  | node yk yv yL yR => header ++ toString (yk, yv) ++ "\n" ++ toStr header' yL ++ toStr header' yR
+  | node yk yv yL yR => header ++ ToString.toString (yk, yv) ++ "\n" ++ toString header' yL ++ toString header' yR
     where header' := header ++ "    "
 
 instance [ToString α] [ToString β] : ToString (SplayMap α β) :=
-  ⟨toStr ""⟩
+  ⟨toString ""⟩
 
+/-- Membership (`∈`), implemented as a function for recursive reasons. Only the keys are said to be members for utility reasons. -/
 @[simp]
 def splayMem (t : SplayMap α β) (x : α) : Prop :=
   match t with
@@ -44,7 +52,7 @@ lemma memNoNil : ∀ (t : SplayMap α β) x, x ∈ t → t ≠ nil := by
   intro a1
   simp_all
 
-/-- Returns the (key, val) pairs of the tree in order. -/
+/-- Returns the `(key, val)` pairs of the map in order. -/
 def toList : SplayMap α β → List (α × β)
   | nil => []
   | node xk xv xL xR => toList xL ++ [(xk, xv)] ++ toList xR
@@ -65,15 +73,33 @@ def left (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
 def right (t : SplayMap α β) (h : t ≠ nil) : SplayMap α β := match t with
   | node _ _ _ right => right
 
+/-- Returns the number of keys in a SplayMap. Useful for proving termination sometimes. -/
 def size : SplayMap α β → Nat
   | SplayMap.nil => 0
   | SplayMap.node _ _ l r => 1 + l.size + r.size
 
-/-- Returns the keys of the tree in order. -/
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- The size of the left submap must be strictly less than that of the original map.-/
+lemma size_mono_left (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.left h).size :=
+  match ht : t with
+  | node k v l r => by
+    rw [size, left]
+    omega
+
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- The size of the right submap must be strictly less than that of the original map.-/
+lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.right h).size :=
+  match t with
+  | node k v l r => by
+    rw [size, right]
+    omega
+
+/-- Returns the keys of the map in order. -/
 def keyList : SplayMap α β → List α :=
   List.map Prod.fst ∘ toList
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- Proved unintentionally; only serves to prove `mem_iff_mem_key_list` now. -/
 theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, (x, y) ∈ t.toList := by
   induction t with
   | nil =>
@@ -107,11 +133,12 @@ theorem mem_iff_mem_list (x : α) (t : SplayMap α β): x ∈ t ↔ ∃ y : β, 
         exact Or.inr (Or.inr (ihR.mpr ⟨y, hR⟩))
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- The recursive membership and membership via the in-order list are equivalent. Mostly meant to be a sanity check. -/
 lemma mem_iff_mem_key_list (x : α) (t : SplayMap α β): x ∈ t ↔ x ∈ t.keyList := by
   simp [keyList, mem_iff_mem_list]
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-theorem list_empty_iff : ∀ t : SplayMap α β, t.toList = [] ↔ t = nil
+lemma list_empty_iff : ∀ t : SplayMap α β, t.toList = [] ↔ t = nil
   | nil => by
     simp [toList]
   | node key _ left right => by
@@ -121,65 +148,12 @@ omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 lemma key_list_empty_iff : ∀ t : SplayMap α β, t.keyList = [] ↔ t = nil := by
   simp [keyList, list_empty_iff]
 
--- def max? (t : SplayMap α β) : Option α :=
---   t.keyList.max?
-
--- def min? (t : SplayMap α β) : Option α :=
---   t.keyList.min?
-
--- omit [DecidableEq α] [DecidableEq β] in
--- lemma max?_eq_none_iff : ∀ t : SplayMap α β, t.max? = none ↔ t = nil := by
---   intro t
---   apply Iff.intro <;> intro h
---   · have h_empty : t.keyList = [] := List.max?_eq_none_iff.mp h
---     exact (key_list_empty_iff t).mp h_empty
---   · simp [max?, h, key_list_empty_iff]
-
--- omit [DecidableEq α] [DecidableEq β] in
--- lemma min?_eq_none_iff : ∀ t : SplayMap α β, t.min? = none ↔ t = nil := by
---   intro t
---   apply Iff.intro <;> intro h
---   · have h_empty : t.keyList = [] := List.min?_eq_none_iff.mp h
---     exact (key_list_empty_iff t).mp h_empty
---   · simp [min?, h, key_list_empty_iff]
-
--- def max_ (t : SplayMap α β) (h : t ≠ nil) : α :=
---   match h' : t.max? with
---   | some k => k
---   | none   => by simp_all only [max?_eq_none_iff]
-
--- theorem max_mem (t : SplayMap α β) (h : t ≠ nil) :
---     (t.max h) ∈ t := by
---   match h' : t.max? with
---   | some k =>
---     simp_all!
---     split
---     · rename_i k' heq
---       rw [(List.max?_eq_some_iff' (h1 : )).mp] at heq
---       sorry
---       sorry
---     · trivial
---   | none   => simp_all only [max?_eq_none_iff]
--- #check List.max?_eq_some_iff'
-
--- def min_ (t : SplayMap α β) (h : t ≠ nil) : α :=
---   match h' : min? t with
---   | some k => k
---   | none   => by simp_all only [min?_eq_none_iff]
-
--- TODO: is the below useful?
--- inductive Forall (p : α → β → Prop) : SplayMap α β → Prop
---   | nil : Forall p .nil
---   | node yk yv yL yR :
---       p yk yv →
---       Forall p yL →
---       Forall p yR →
---     Forall p (node yk yv yL yR)
-
+/-- Implements `∀` for `SplayMap`s in a rather convenient way. Motivated by other tree maps implemented in Lean. -/
 @[simp]
 def Forall (p : α → Prop) (t : SplayMap α β) : Prop :=
   ∀ x ∈ t, p x
 
+/-- An inductive definition of sortedness for `SplayMap`. It enforces uniqueness of keys by virtue of demanding a strict inequalty.  -/
 inductive Sorted : SplayMap α β → Prop
   | nil : Sorted nil
   | node yk yv yL yR :
@@ -188,20 +162,6 @@ inductive Sorted : SplayMap α β → Prop
       Sorted yL →
       Sorted yR →
     Sorted (node yk yv yL yR)
-
-omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma size_mono_left (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.left h).size :=
-  match ht : t with
-  | node k v l r => by
-    rw [size, left]
-    omega
-
-omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma size_mono_right (t : SplayMap α β) (h : t ≠ nil) : t.size > (t.right h).size :=
-  match t with
-  | node k v l r => by
-    rw [size, right]
-    omega
 
 /-- Rotates the edge joining the supplied node and its left child, if it exists. -/
 def rotateLeftChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) : SplayMap α β :=
@@ -215,17 +175,8 @@ def rotateRightChild (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.right h1 ≠ 
   | node yk yv yL (node yrk yrV yRL yRR) =>
     node yrk yrV (node yk yv yL yRL) yRR
 
-omit [DecidableEq α] [DecidableEq β] in
-@[simp]
-theorem Sorted_implies_left_Sorted (t : SplayMap α β) (h : t ≠ nil) :
-    Sorted t → Sorted (t.left h) := by
-  intro st
-  match t, st with
-  | node yk yv yL yR, .node _ _ _ _ biggerL smallerR sL sR =>
-    simp [left]
-    exact sL
-
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- The left rotation operator preserves the non-emptiness of a `SplayMap`. -/
 lemma rotateLeftChild_preserves_no_nil (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.left h1 ≠ nil) :
     rotateLeftChild t h1 h2 ≠ nil := by
   match t with
@@ -233,6 +184,7 @@ lemma rotateLeftChild_preserves_no_nil (t : SplayMap α β) (h1 : t ≠ nil) (h2
     simp_all!
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- The right rotation operator preserves the non-emptiness of a `SplayMap`. -/
 lemma rotateRightChild_preserves_no_nil (t : SplayMap α β) (h1 : t ≠ nil) (h2 : t.right h1 ≠ nil) :
     rotateRightChild t h1 h2 ≠ nil := by
   match t with
@@ -240,6 +192,7 @@ lemma rotateRightChild_preserves_no_nil (t : SplayMap α β) (h1 : t ≠ nil) (h
     simp_all!
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `rotateLeftChild` preserves the set of members of a `SplayMap`. -/
 lemma rotateLeft_preserves_membership (t : SplayMap α β) (nt : t ≠ nil) (ntL : t.left nt ≠ nil) :
     ∀ x, x ∈ t → x ∈ rotateLeftChild t nt ntL := by
   intro x mx
@@ -249,6 +202,7 @@ lemma rotateLeft_preserves_membership (t : SplayMap α β) (nt : t ≠ nil) (ntL
     aesop
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `rotateRigftChild` preserves the set of members of a `SplayMap`. -/
 lemma rotateRight_preserves_membership (t : SplayMap α β) (nt : t ≠ nil) (ntR : t.right nt ≠ nil) :
     ∀ x, x ∈ t → x ∈ rotateRightChild t nt ntR := by
   intro x mx
@@ -258,18 +212,32 @@ lemma rotateRight_preserves_membership (t : SplayMap α β) (nt : t ≠ nil) (nt
     aesop
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `rotateLeftChild` sends the leftmost grandchild to the left submap. -/
 lemma rotate_left_eq_grand_left (t : SplayMap α β) (nt : t ≠ nil) (ntL : t.left nt ≠ nil) :
     (rotateLeftChild t nt ntL).left (rotateLeftChild_preserves_no_nil t nt ntL) = (t.left nt).left ntL := by
   match t with
     | node yk yv (node ylk ylv yLL yLR) yR => aesop
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `rotateRightChild` sends the rightmost grandchild to the right submap. -/
 lemma rotate_right_eq_grand_right (t : SplayMap α β) (nt : t ≠ nil) (ntR : t.right nt ≠ nil) :
     (rotateRightChild t nt ntR).right (rotateRightChild_preserves_no_nil t nt ntR) = (t.right nt).right ntR := by
   match t with
     | node yk yv yL (node yrk yrv yRL yRR) => aesop
 
 omit [DecidableEq α] [DecidableEq β] in
+/-- If a `SplayMap` is sorted, so must be its left submap. -/
+@[simp]
+theorem Sorted_implies_left_Sorted (t : SplayMap α β) (h : t ≠ nil) :
+    Sorted t → Sorted (t.left h) := by
+  intro st
+  match t, st with
+  | node yk yv yL yR, .node _ _ _ _ biggerL smallerR sL sR =>
+    simp [left]
+    exact sL
+
+omit [DecidableEq α] [DecidableEq β] in
+/-- If a `SplayMap` is sorted, so must be its right submap. -/
 @[simp]
 theorem Sorted_implies_right_Sorted (t : SplayMap α β) (h : t ≠ nil) :
     Sorted t → Sorted (t.right h) := by
@@ -280,6 +248,7 @@ theorem Sorted_implies_right_Sorted (t : SplayMap α β) (h : t ≠ nil) :
     exact sR
 
 omit [DecidableEq α] [DecidableEq β] in
+/-- In a sorted map, each member to the left of the root must be strictly smaller than each member to the right of the root. -/
 theorem Sorted_implies_left_lt_right (t : SplayMap α β) (nt : t ≠ nil) :
     Sorted t → ∀ x y, x ∈ t.left nt → y ∈ t.right nt → x < y := by
   intro st
@@ -290,6 +259,7 @@ theorem Sorted_implies_left_lt_right (t : SplayMap α β) (nt : t ≠ nil) :
     have k_lt_y : k < y := smallerR y my
     exact lt_trans x_lt_k k_lt_y
 
+/-- Checks for non-emptiness and sortedness of the map and returns the maximum element. The sortedness is used to achieve a logarithmic time complexity. -/
 def max (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
   if nR : t.right nt = nil then
     t.key nt
@@ -298,6 +268,7 @@ def max (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
 termination_by t.size
 decreasing_by (exact size_mono_right t nt)
 
+/-- Checks for non-emptiness and sortedness of the map and returns the minimum element. The sortedness is used to achieve a logarithmic time complexity. -/
 def min (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
   if nL : t.left nt = nil then
     t.key nt
@@ -306,9 +277,24 @@ def min (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) : α :=
 termination_by t.size
 decreasing_by (exact size_mono_left t nt)
 
+/-- The `max` function returns a member of the map. -/
 theorem max_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) :
     (t.max st nt) ∈ t := by
-  sorry
+  induction t with
+  | nil => trivial
+  | node yk yv yL yR ihL ihR =>
+    let t : SplayMap α β := node yk yv yL yR
+    by_cases h : yR = nil
+    have h : yk ∈ t := by
+      aesop
+    · have h : t.max st nt = yk := by
+        sorry
+      aesop
+    · have h' : t.max st nt = yR.max (Sorted_implies_right_Sorted t nt st) (by simp [h]) := by
+        sorry
+      have h' : yR.max (Sorted_implies_right_Sorted t (by aesop) st) (by simp [h]) ∈ yR := by
+        sorry
+      aesop
   -- cases hR : t.right nt
   -- · simp_all! [max]
   --   rw [key]
@@ -316,6 +302,7 @@ theorem max_mem (t : SplayMap α β) (st : Sorted t) (nt : t ≠ nil) :
 #check List.max?_eq_some_iff'
 
 omit [DecidableEq α] [DecidableEq β] in
+/-- If a map is sorted, so must be its left submap. -/
 theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (nL : t.left nt ≠ nil) :
     Sorted t → Sorted (rotateLeftChild t nt nL) := by
   intro st
@@ -352,6 +339,7 @@ theorem Sorted_implies_rotateLeft_Sorted (t : SplayMap α β) (nt : t ≠ nil) (
     exact .node ylk ylv yLL (node yk yv yLR yR) ylk_bigger_yLL ylk_smaller_right sLL snewR
 
 omit [DecidableEq α] [DecidableEq β] in
+/-- If a map is sorted, so must be its right submap. -/
 theorem Sorted_implies_rotateRight_Sorted (t : SplayMap α β) (nt : t ≠ nil) (nR : t.right nt ≠ nil) :
     Sorted t → Sorted (rotateRightChild t nt nR) := by
   intro st
@@ -387,41 +375,8 @@ theorem Sorted_implies_rotateRight_Sorted (t : SplayMap α β) (nt : t ≠ nil) 
           simp_all only [ne_eq, true_and, instSplayMapMem, Forall]
     exact .node yrk yrv (node yk yv yL yRL) yRR yrk_bigger_left yrk_smaller_yRR snewL sRR
 
--- theorem le_max_of_mem (t : SplayMap α β) (h : t ≠ nil) (x : α) (mx : x ∈ t) :
---   x ≤ max t h := by
---   have h' : t.keyList ≠ [] := by
---     simp_all only [ne_eq, bne_iff_ne, mem_iff_mem_key_list, splayMem]
---     intro a
---     simp_all only [List.not_mem_nil]
---   unfold max
---   generalize hmax : max? t = o
---   cases o with
---   | none =>
---     dsimp [max?] at h'
---     have h_empty : t.keyList = [] := List.max?_eq_none_iff.mp hmax
---     contradiction
---   | some k' =>
-
-/- I was trying...
-  intro t x h
-  intro h
-  induction t with
-  | nil => trivial
-  | node yk yv yL yR =>
-      if h' : x = yk then
-        subst h'
-        cases yL with
-        | nil => trivial
-        | node ylk ylv yll ylr =>
-            aesop?
-      else if x < yk then
-        rotateLeftPreservesMem yL x h
-      else
-        rotateLeftPreservesMem yR x h
--/
-
 /--
-Inductive type to keep track of where a particular value is present in a tree,
+Inductive type to keep track of where a particular value is present in a map,
 in the first two levels: at the `root`, at the `left` child of the root,
 or at the `right` child of the root.
 The `locationOf` function defined below returns `none` if it is at none of these.
@@ -430,6 +385,7 @@ inductive Location
   | root | left | right
   deriving DecidableEq
 
+/-- Structure used to implement the `locationOf` function, allowing implementation of dependent proposition types in the output. -/
 structure Prop_Proof where
   prop : Prop
   proof : prop
@@ -450,24 +406,28 @@ def atRight (t : SplayMap α β) (x : α) : Prop :=
   | _ => False
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `atRoot` proves the non-emptiness of the map. -/
 lemma atRoot_implies_not_nil (t : SplayMap α β) (x : α) :
     atRoot t x → t ≠ nil := by
   intro h nt
   simp_all [atRoot]
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `atLeft` proves the non-emptiness of the map. -/
 lemma atLeft_implies_not_nil (t : SplayMap α β) (x : α) :
     atLeft t x → t ≠ nil := by
   intro h nt
   simp_all [atLeft]
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `atRight` proves the non-emptiness of the map. -/
 lemma atRight_implies_not_nil (t : SplayMap α β) (x : α) :
     atRight t x → t ≠ nil := by
   intro h nt
   simp_all [atRight]
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `atLeft` proves the non-emptiness of the left submap. -/
 lemma atLeft_implies_left_not_nil (t : SplayMap α β) (x : α) (al : atLeft t x) : t.left (atLeft_implies_not_nil t x al) ≠ nil := by
   intro ntL
   match t with
@@ -478,6 +438,7 @@ lemma atLeft_implies_left_not_nil (t : SplayMap α β) (x : α) (al : atLeft t x
     simp_all
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `atRight` proves the non-emptiness of the right submap. -/
 lemma atRight_implies_right_not_nil (t : SplayMap α β) (x : α) (ar : atRight t x) : t.right (atRight_implies_not_nil t x ar) ≠ nil := by
   intro ntR
   match t with
@@ -487,8 +448,8 @@ lemma atRight_implies_right_not_nil (t : SplayMap α β) (x : α) (ar : atRight 
   | node yk yv yL (node yrk yrV yRL yRR) =>
     simp_all
 
-/-- Returns the `Location` of the supplied value in the supplied tree.
-Returns `none` if it is not in the first two levels of the tree. -/
+/-- Returns the `Location` of the supplied value in the supplied map.
+Returns `none` if it is not in the first two levels of the map. -/
 def locationOf (t : SplayMap α β) (x : α) : Option Location × Prop_Proof := by
   match ht : t with
   | nil => exact (none, ⟨True, trivial⟩)
@@ -515,6 +476,7 @@ def locationOf (t : SplayMap α β) (x : α) : Option Location × Prop_Proof := 
         else exact (none, ⟨True, trivial⟩)
 
 omit [DecidableEq β] in
+/-- If the `locationOf x` is `.left`, then `locationOf x` proves that `x` is at the root. Useful when pattern matching. -/
 theorem root_marries_atRoot (t : SplayMap α β) (x : α) :
     (t.locationOf x).1 = Location.root → (t.locationOf x).2.1 = atRoot t x := by
       intro hloc
@@ -525,6 +487,7 @@ theorem root_marries_atRoot (t : SplayMap α β) (x : α) :
         aesop
 
 omit [DecidableEq β] in
+/-- If the `locationOf x` is `.left`, then `locationOf x` proves that `x` is at the root's left subnode. Useful when pattern matching. -/
 theorem left_marries_atLeft (t : SplayMap α β) (x : α) :
     (t.locationOf x).1 = Location.left → (t.locationOf x).2.1 = atLeft t x := by
     intro hloc
@@ -535,6 +498,7 @@ theorem left_marries_atLeft (t : SplayMap α β) (x : α) :
       aesop
 
 omit [DecidableEq β] in
+/-- If the `locationOf x` is `.right`, then `locationOf x` proves that `x` is at the root's right subnode. Useful when pattern matching. -/
 theorem right_marries_atRight (t : SplayMap α β) (x : α) :
     (t.locationOf x).1 = Location.right → (t.locationOf x).2.1 = atRight t x := by
     intro hloc
@@ -545,6 +509,7 @@ theorem right_marries_atRight (t : SplayMap α β) (x : α) :
       aesop
 
 omit [DecidableEq β] in
+/-- If the `locationOf x` is `.left`, then `locationOf x` proves that `x` is at the root's left subnode. Useful when pattern matching. A fancier version of `left_marries_atLeft`. -/
 theorem fancy_marriage_atLeft (t : SplayMap α β) (x : α) :
     t.locationOf x matches (Location.left, _) → atLeft t x := by
   intro ht
@@ -564,6 +529,7 @@ theorem fancy_marriage_atLeft (t : SplayMap α β) (x : α) :
   | (none, ⟨P, p⟩) => simp_all
 
 omit [DecidableEq β] in
+/-- If the `locationOf x` is `.right`, then `locationOf x` proves that `x` is at the root's right subnode. Useful when pattern matching. A fancier version of `right_marries_atRight`. -/
 theorem fancy_marriage_atRight (t : SplayMap α β) (x : α) :
     t.locationOf x matches (Location.right, _) → atRight t x := by
   intro ht
@@ -582,80 +548,8 @@ theorem fancy_marriage_atRight (t : SplayMap α β) (x : α) :
   | (Location.root, ⟨P, p⟩) => simp_all
   | (none, ⟨P, p⟩) => simp_all
 
-  -- match t with
-  -- | nil => trivial
-  -- | node yk _ yL yR =>
-  --   simp [atRoot, locationOf] at loc
-  --   exact ⟨by aesop, loc⟩
-
--- lemma loc_left_implies_left_not_nil (t : SplayMap α β) (x : α) (hloc : t.locationOf x = Location.left) :
---     t.left (loc_left_implies_not_nil t x hloc) ≠ nil := by
---   match t with
---   | nil => trivial
---   | node yk _ yL yR =>
---     dsimp
-
--- lemma root_means_root (t : SplayMap α β) (x : α) (lx : t.locationOf x = Location.root) :
---     t ≠ nil ∧
-
--- TODO: do we use the three above functions anywhere? should we use them in `locationOf`?
-
--- theorem splayButOneMemberLocation (t : SplayMap α β) (x : α) (h : x ∈ t) :
---     (t.splayButOne x).locationOf x ≠ .idk := by
---   cases t with
---   | nil =>
---       absurd h
---       exact noMemNil x
---   | node yk yv yL yR =>
---       if h₁ : x = yk then
---         subst h₁
---         have h' : (node x yv yL yR).locationOf x = .root := by
---           simp_all!
---         intro h''
---         have p : Location.root ≠ Location.idk := by
---           intro q
---           trivial
---         simp_all!
---       else if x < yk then
---         sorry
---       else
---         sorry
-
-/- Doesn't work, needs rewriting `splay?`. -/
-
--- def delete (t : SplayMap α β) (x : α) (h : x ∈ t) : SplayMap α β :=
---   let t' := t.splay x h  -- First splay the node to delete to the root
---   have h' : x ∈ t' := splay_preserves_membership t x h
---   match t' with
---   | nil => absurd h' (noMemNil x)
---   | node k v l r =>
---     if x = k then
---       let (maxK, maxV) := l.max (by sorry)
---       let l' := l.splay maxK (by
---         simp [Membership.mem, splayMem]
---         apply l.max_mem (by sorry))
---       match l' with
---         | node _ _ ll lr => node maxK maxV ll r
---         | nil => nil
---       -- match l.max? with
---       -- | none => r
---       -- | some (maxK, maxV) =>
---       --     -- Splay the max of left subtree to root
---       --     let l' := l.splay maxK (by
---       --       simp [Membership.mem, splayMem]
---       --       exact l.max_mem (by sorry))
---       --     match l' with
---       --     | node _ _ ll lr => node maxK maxV ll r
---       --     | nil => nil
---     else
---       -- Prove contradiction
---       sorry
-
-/- Builds a `SplayMap` from a `List` by inserting its elements one-by-one. -/
--- def fromList (L : List (α × β)) : SplayMap α β :=
---   L.foldl (fun t (xk, xv) => t.insert xk xv) nil
-
 omit [DecidableEq α] [DecidableEq β] in
+/-- In a sorted map, if a given `key` is smaller than the root, then it must be in the left submap. -/
 lemma mem_lt_key_implies_mem_left (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     x < t.key (t.memNoNil x mx) → x ∈ t.left (t.memNoNil x mx) := by
   match t with
@@ -681,6 +575,7 @@ lemma mem_lt_key_implies_mem_left (t : SplayMap α β) (st : Sorted t) (x : α) 
           simp_all
 
 omit [DecidableEq α] [DecidableEq β] in
+/-- In a sorted map, if a given `key` is greater than the root, then it must be in the right submap. -/
 lemma mem_gt_key_implies_mem_right (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     t.key (t.memNoNil x mx) < x → x ∈ t.right (t.memNoNil x mx) := by
   match t with
@@ -704,30 +599,23 @@ lemma mem_gt_key_implies_mem_right (t : SplayMap α β) (st : Sorted t) (x : α)
             exact lt_gt_false x yk xlt xgt
           simp_all
 
-
-
 /--
-Looks for a value `x` in a `SplayMap`.
-If found, splays the tree at that node, executing zig-zig and zig-zag steps
-but *not* a zig step.
-That is, if `x` ends up as a child of the root, a final rotation to bring it to
-the root is *not* performed.
-This is necessary for recursion to work in the `splay` function.
+Looks for a value `x` in a sorted `SplayMap`. If found, splays the map at that node, executing zig-zig and zig-zag steps but *not* a zig step, i.e. it performs *pairs* of rotations to bring `x` near the root.
+If `x` ends up as a child of the root, a final rotation to bring it to the root is *not* performed. This is necessary for recursion to work in the `splay` function.
 -/
 def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β :=
   match t with
   | node yk yv yL yR =>
-      if x = yk then
+      if heq : x = yk then
         t
       else if h : x < yk then
         let yL' := yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x (mem_lt_key_implies_mem_left (node yk yv yL yR) st x mx h)
         match hyL' : yL'.locationOf x with
         | (Location.root, ⟨P, p⟩) => node yk yv yL' yR
         | (Location.left, ⟨P, p⟩) =>
-          have h1' : atLeft yL' x := by simp_all [fancy_marriage_atLeft]
+          have h1' : atLeft yL' x := by simp_all only[fancy_marriage_atLeft]
           have nyL' : yL' ≠ nil := atLeft_implies_not_nil yL' x h1'
           have nyL'L : yL'.left nyL' ≠ nil := atLeft_implies_left_not_nil yL' x h1'
-
           let t' := (node yk yv yL' yR).rotateLeftChild (by simp) nyL'
           have nt' : t' ≠ nil := rotateLeftChild_preserves_no_nil (node yk yv yL' yR) (by simp) nyL'
           have heq_t'L_yL'L : t'.left nt' = yL'.left nyL' :=
@@ -735,42 +623,57 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
           have nt'L : t'.left nt' ≠ nil := by simp_all
           t'.rotateLeftChild nt' nt'L
         | (Location.right, ⟨P, p⟩) =>
-          have h1' : atRight yL' x := by simp_all [fancy_marriage_atRight]
+          have h1' : atRight yL' x := by simp_all only [fancy_marriage_atRight]
           have nyL' : yL' ≠ nil := atRight_implies_not_nil yL' x h1'
           have nyL'R : yL'.right nyL' ≠ nil := atRight_implies_right_not_nil yL' x h1'
-
           let yL'' := yL'.rotateRightChild nyL' nyL'R
           have : yL'' ≠ nil := rotateRightChild_preserves_no_nil yL' nyL' nyL'R
           (node yk yv yL'' yR).rotateLeftChild (by simp) (by simp_all)
         | (none, ⟨P, p⟩) => sorry
       else
-        let yR' := yR.splayButOne ((node yk yv yL yR).Sorted_implies_right_Sorted (by simp) st) x (sorry)
-        match yR'.locationOf x with
+        have hr : yk < x := by
+          simp_all only [gt_iff_lt, not_false_eq_true, gt_of_ne_not_lt]
+        let yR' := yR.splayButOne ((node yk yv yL yR).Sorted_implies_right_Sorted (by simp) st) x (mem_gt_key_implies_mem_right (node yk yv yL yR) st x mx hr)
+        match hyR' : yR'.locationOf x with
         | (Location.root, ⟨P, p⟩) => node yk yv yL yR'
-        | (Location.right, ⟨P, p⟩) =>
-          have : yR' ≠ nil := by sorry
-          let t' := (node yk yv yL yR').rotateRightChild (by simp) (sorry)
-          t'.rotateRightChild (sorry) (sorry)
         | (Location.left, ⟨P, p⟩) =>
-          let yR'' := yR'.rotateLeftChild (sorry) (sorry)
-          (node yk yv yL yR'').rotateRightChild (sorry) (sorry)
+          have h1' : atLeft yR' x := by simp_all only [fancy_marriage_atLeft]
+          have nyR' : yR' ≠ nil := atLeft_implies_not_nil yR' x h1'
+          have nyR'L : yR'.left nyR' ≠ nil := atLeft_implies_left_not_nil yR' x h1'
+          let yR'' := yR'.rotateLeftChild nyR' nyR'L
+          have hww : yR'' ≠ nil := rotateLeftChild_preserves_no_nil yR' nyR' nyR'L
+          (node yk yv yL yR'').rotateRightChild (by simp) (by simp_all)
+        | (Location.right, ⟨P, p⟩) =>
+          have h1' : atRight yR' x := by simp_all only [fancy_marriage_atRight]
+          have nyR' : yR' ≠ nil := atRight_implies_not_nil yR' x h1'
+          have nyR'R : yR'.right nyR' ≠ nil := atRight_implies_right_not_nil yR' x h1'
+          let t' := (node yk yv yL yR').rotateRightChild (by simp) nyR'
+          have nt' : t' ≠ nil := rotateRightChild_preserves_no_nil (node yk yv yL yR') (by simp) nyR'
+          have heq_t'R_yR'R : t'.right nt' = yR'.right nyR' :=
+            rotate_right_eq_grand_right (node yk yv yL yR') (by simp) nyR'
+          have nt'R : t'.right nt' ≠ nil := by simp_all
+          t'.rotateRightChild nt' nt'R
         | (none, ⟨P, p⟩) => sorry
 
+/-- `splayButOne` never encounters the `none` case of `locationOf`. -/
 theorem splayButOne_location (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
    ((t.splayButOne st x mx).locationOf x).1 ≠ none := by sorry
 
+/-- For any `SplayMap`, its set of members is preserved upon applying `splayButOne`. -/
 theorem splayButOne_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     ∀ y, y ∈ t ↔ y ∈ t.splayButOne st x mx := by
   sorry
 
 omit [DecidableEq α] [DecidableEq β] in
+/-- Decomposes the `Sorted`ness condition into its constituents for easier use. -/
 theorem sorted_unfold (yk : α) (yv : β) (yL yR : SplayMap α β) :
     Forall (fun k => k < yk) yL → Forall (fun k => yk < k) yR → Sorted yL → Sorted yR →
     Sorted (node yk yv yL yR) := by
   intro h1 h2 sL sR
   exact Sorted.node yk yv yL yR h1 h2 sL sR
 
-theorem splayButOne_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
+/-- The output of `splayButOne` is a sorted `SplayMap`. -/
+theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     Sorted (t.splayButOne st x mx) := by
   induction t with
   | nil => contradiction
@@ -783,27 +686,28 @@ theorem splayButOne_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x
       split
       · rename_i h_2
         subst h_2
-        simp_all only [instSplayMapMem, splayMem, true_or, not_true_eq_false]
+        trivial
       · have m_x_yL : x ∈ yL := mem_lt_key_implies_mem_left (node yk yv yL yR) st x mx h
         let yL' := yL.splayButOne ((node yk yv yL yR).Sorted_implies_left_Sorted (by simp) st) x m_x_yL
-        match hyL' : yL'.locationOf x with
-        | (Location.root, ⟨P, p⟩) =>
-          have hyL_to_yL' : yL.Sorted → yL'.Sorted := by
+        have hyL_to_yL' : yL.Sorted → yL'.Sorted := by
             intro a
             simp_all only [yL']
-          have syL : yL.Sorted := Sorted_implies_left_Sorted (node yk yv yL yR) (by simp) st
-          have syL' : yL'.Sorted := hyL_to_yL' syL
-          have hltR : Forall (fun k ↦ yk < k) yR := match st with
-            | .node _ _ _ _ biggerL smallerR sL sR => smallerR
-          have syR : Sorted yR := match st with
-            | .node _ _ _ _ biggerL smallerR sL sR => sR
-          have hgtL : Forall (fun k ↦ k < yk) yL := match st with
-            | .node _ _ _ _ biggerL smallerLR s sR => biggerL
-          have hgtL' : Forall (fun k ↦ k < yk) yL' := by
-            intro yl' m_yl'_yL'
-            have m_yl'_yL : yl' ∈ yL := (splayButOne_preserves_membership yL syL x m_x_yL yl').mpr m_yl'_yL'
-            exact hgtL yl' m_yl'_yL
-          have sNew : (node yk yv yL' yR).Sorted := by
+        have syL : yL.Sorted := Sorted_implies_left_Sorted (node yk yv yL yR) (by simp) st
+        have syL' : yL'.Sorted := hyL_to_yL' syL
+        have hltR : Forall (fun k ↦ yk < k) yR := match st with
+          | .node _ _ _ _ biggerL smallerR sL sR => smallerR
+        have syR : Sorted yR := match st with
+          | .node _ _ _ _ biggerL smallerR sL sR => sR
+        have hgtL : Forall (fun k ↦ k < yk) yL := match st with
+          | .node _ _ _ _ biggerL smallerLR s sR => biggerL
+        have hgtL' : Forall (fun k ↦ k < yk) yL' := by
+          intro yl' m_yl'_yL'
+          have m_yl'_yL : yl' ∈ yL := (splayButOne_preserves_membership yL syL x m_x_yL yl').mpr m_yl'_yL'
+          exact hgtL yl' m_yl'_yL
+        let tNew := (node yk yv yL' yR)
+        match hyL' : yL'.locationOf x with
+        | (Location.root, ⟨P, p⟩) =>
+          have sNew : tNew.Sorted := by
             apply sorted_unfold
             · exact hgtL'
             · exact hltR
@@ -811,15 +715,25 @@ theorem splayButOne_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x
             · exact syR
           aesop
         | (Location.left, ⟨P, p⟩) =>
-          sorry
+          have nyL' : yL' ≠ nil := atLeft_implies_not_nil yL' x (by simp_all only [fancy_marriage_atLeft])
+          let tNewRl := tNew.rotateLeftChild (by simp) nyL'
+          have nNewRl : (tNewRl) ≠ nil :=
+            rotateLeftChild_preserves_no_nil tNew (by simp) nyL'
+          have h1 : tNewRl.atLeft x := by
+            apply fancy_marriage_atLeft
+          have nNewRlL : (tNewRl).left nNewRl ≠ nil :=
+            atLeft_implies_left_not_nil tNewRl x h1
+          have : ((tNew.rotateLeftChild (by simp) nyL').rotateLeftChild nNewRl nNewRlL).Sorted := sorry
+          aesop
         | (Location.right, ⟨P, p⟩) =>
           sorry
         | (none, ⟨P, p⟩) =>
-          sorry
-
+          have : (yL'.locationOf x).1 ≠ none := splayButOne_location yL syL x m_x_yL
+          simp [hyL'] at this
     else
       sorry
 
+/-- `splay` looks for a member of the `SplayMap`, and bubbles it right up to the top, altering the `SplayMap` in the process. -/
 def splay (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMap α β :=
   let t' := t.splayButOne st x mx
   match t'lx : t'.locationOf x with
@@ -838,10 +752,11 @@ def splay (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : SplayMa
     have : (t'.locationOf x).1 ≠ none := splayButOne_location t st x mx
     simp [t'lx] at this
 
+/-- The output of `splay` is a sorted `SplayMap`. -/
 theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     x ∈ t.splay st x mx := by
-  -- let t' := t.splayButOne st x mx
-  have mxsbo : x ∈ t.splayButOne st x mx := sorry
+  have mxsbo : x ∈ t.splayButOne st x mx :=
+    (splayButOne_preserves_membership t st x mx x).mp mx
   match t'lx : (t.splayButOne st x mx).locationOf x with
   | (Location.root, ⟨P, p⟩) =>
     rw [splay]
@@ -856,9 +771,10 @@ theorem splay_preserves_membership (t : SplayMap α β) (st : Sorted t) (x : α)
     have := splayButOne_location t st x mx
     simp_all
 
+/-- The output of `splayButOne` is a sorted `SplayMap`. -/
 theorem splay_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     Sorted (t.splay st x mx) := by
-  have ssbo : Sorted (t.splayButOne st x mx) := splayButOne_sorted t st x mx
+  have ssbo : Sorted (t.splayButOne st x mx) := splayButOne_preserves_sorted t st x mx
   match t'lx : (t.splayButOne st x mx).locationOf x with
   | (Location.root, ⟨P, p⟩) =>
     rw [splay]
@@ -873,6 +789,7 @@ theorem splay_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) (mx
     have := splayButOne_location t st x mx
     simp_all
 
+/-- Performs a search for `x` on the `SplayMap t` by using the BST structure, and returns the element found in the process. -/
 def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
   match ht : t with
   | nil => by contradiction
@@ -894,6 +811,7 @@ def last_to (t : SplayMap α β) (nt : t ≠ nil) (x : α) : α :=
           simp_all [SplayMap.size]
         last_to yR nyR x
 
+/-- `last_to` always returns a member of the map. -/
 theorem last_to_mem (t : SplayMap α β) (nt : t ≠ nil) (x : α) : t.last_to nt x ∈ t := by
   induction t with
   | nil => contradiction
@@ -912,6 +830,7 @@ theorem last_to_mem (t : SplayMap α β) (nt : t ≠ nil) (x : α) : t.last_to n
         simp_all [last_to]
         aesop
 
+/-- If the input `x` of `last_to` is in the map, then the output of `last_to` must be `x`. -/
 theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     t.last_to (memNoNil t x mx) x = x := by
   induction t with
@@ -938,6 +857,7 @@ theorem last_to_eq_if_mem (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x 
           (node yk yv yL yR).Sorted_implies_right_Sorted (by simp) st
         simp_all [last_to]
 
+/-- `last_to`, when asked to search for `x`, returns the closest element to `x` not greater than `x`. -/
 theorem last_to_closest_lt (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) :
     t.last_to (memNoNil t x mx) x < x → ∀ y ∈ t, y < t.last_to (memNoNil t x mx) x ∨ x < y := by
   let k := t.last_to (memNoNil t x mx) x
@@ -969,6 +889,7 @@ theorem last_to_closest_lt (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x
         simp_all [last_to]
         sorry
 
+/-- Searches for `x` in the `SplayMap t`, and bubbles up the result of `last_to` to the root, modifying `t` in the process.-/
 def search (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
   match ht : t with
   | nil => nil
@@ -977,6 +898,7 @@ def search (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
     rw [←ht] at st
     exact t.splay st (t.last_to nt x) (last_to_mem t nt x)
 
+/-- `search` does not alter the set of members in a SplayMap. -/
 theorem search_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : α) : Sorted (t.search st x) := by
   match ht : t with
   | nil => simp_all [search]
@@ -991,6 +913,7 @@ def split (t : SplayMap α β) (st : Sorted t) (x : α) (h : x ∈ t) : SplayMap
       if x ≤ yk then (yL, node yk yv nil yR)
       else (node yk yv yL nil, yR)
 
+/-- Inserts `(xk, xv)` into the search map. If `xk` is already present as a key, then the stored value is altered. In either case, the search map is altered. -/
 def insert (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) : SplayMap α β :=
   let t' := t.search st xk
   match t' with
@@ -1003,6 +926,7 @@ def insert (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) : SplayMap �
     else
       node xk xv L (node k v nil R)
 
+/-- Inserting elements into a sorted `SplayMap` returns a sorted `SplayMap`. -/
 theorem insert_preserves_sorted (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) :
     Sorted (t.insert st xk xv) := by
   have st' : Sorted (t.search st xk) := t.search_preserves_sorted st xk
@@ -1024,6 +948,7 @@ theorem insert_preserves_sorted (t : SplayMap α β) (st : Sorted t) (xk : α) (
         exact .node xk xv (node k v L nil) R (by simp_all) xk_lt_R (.node k v L nil gt_L (by simp) sL Sorted.nil) sR
       · sorry
 
+/-- Takes a list of `(key, val)` pairs and makes a SplayMap out of them. -/
 def fromList : List (α × β) → SplayMap α β
   | [] => nil
   | (xk, xv)::ls =>
@@ -1035,21 +960,24 @@ def fromList : List (α × β) → SplayMap α β
   --                     (nil, h) ls
   -- exact Prod.fst tst
 
-/- Joins two splay trees where all keys in L are less than all keys in R -/
+/- Joins two `splayMap`s `L`, `R` where all keys in `L` are less than all keys in `R`. -/
 def join (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R) (ord : ∀ x y, x ∈ L → y ∈ R → x < y) :
     SplayMap α β :=
   match hL : L, hR : R with
   | nil, _ => R
   | _, nil => L
-  | L, R =>
+  | node Ll Lv LL LR, node Rl Rv RL RR =>
+      let L := node Ll Lv LL LR
+      let R := node Rl Rv RL RR
       -- Find and splay the max element in L
-      let maxK := L.max sL (sorry)
-      let L' := L.splay sL maxK (L.max_mem sL (sorry))
+      let maxK := L.max sL (by simp)
+      let L' := L.splay sL maxK (L.max_mem sL (_))
       -- Now max element is at root of L'
       match L' with
       | node k v L _ => node k v L R
       | nil => sorry
 
+/-- Tries to find the key `x` in map, and deletes it and the corresponding value it if found. Returns an error if `x` is not a key already. -/
 def delete (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
   let t' := t.search st x
   match ht' : t' with
@@ -1066,6 +994,7 @@ def delete (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
     else
       exact panic! "key not found"
 
+/-- Tries to find `x` in the map, and deletes it if found. Does not delete anything if `x` is not found, but alters the tree in the search process nonetheless. -/
 def delete! (t : SplayMap α β) (st : Sorted t) (x : α) : SplayMap α β :=
   let t' := t.search st x
   match ht' : t' with

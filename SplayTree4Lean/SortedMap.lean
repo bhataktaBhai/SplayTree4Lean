@@ -4,6 +4,16 @@ universe u v
 variable {α : Type u} [LinearOrder α] [DecidableEq α]
 variable {β : Type v} [DecidableEq β]
 
+/-! A formal implementation of Splay maps. These are implemented using dynamic self-balancing search trees, modified mainly by a `splay` operation, attributed to Sleator and Tardos (https://www.cs.cmu.edu/~sleator/papers/self-adjusting.pdf).
+
+API offered by this module:
+- `SortedMap α β` is a splay map with `key`s of type `α` with a `LinearOrder` instance, and `value`s of type `β`.
+- `SortedMap.nil` is the empty tree.
+- `search` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the map with `x` splayed to the root. Even if `x` is not in the map, the output map may still be modified.
+- `insert` is a function that takes a `SortedMap α β`, a key `xk : α`, a value `xv : β`, and returns the map with `(xk, xv)` inserted. If `xk` is already in the map, the value is updated.
+- `delete` is a function that takes a `SortedMap α β` and a key `x : α`, and returns the map with `x` deleted. If `x` is not in the input map, the output map may still be modified.
+ -/
+
 def SortedMap (α : Type u) (β : Type v) [LinearOrder α] :=
   { t : SplayMap α β // SplayMap.Sorted t }
 

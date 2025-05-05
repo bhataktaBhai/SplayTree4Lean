@@ -653,6 +653,8 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
             intro a
             simp_all only [yL']
         have syL : yL.Sorted := Sorted_implies_left_Sorted (node yk yv yL yR) (by simp) st
+        have nyL' : yL' ≠ nil := by
+          sorry
         have syL' : yL'.Sorted := hyL_to_yL' syL
         have hltR : Forall (fun k ↦ yk < k) yR := match st with
           | .node _ _ _ _ biggerL smallerR sL sR => smallerR
@@ -673,6 +675,7 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
           · exact hltR
           · exact syL'
           · exact syR
+        let yL'R : SplayMap α β := yL'.right (nyL')
         match hyL' : yL'.locationOf x with
         | .root _ =>
           have sNew : tNew.Sorted := by
@@ -685,27 +688,45 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
         | .left p =>
           have nyL' : yL' ≠ nil := atLeft_implies_not_nil yL' x (by simp_all only)
           let tNewRl := tNew.rotateLeftChild (by simp) nyL'
-          have nNewRl : (tNewRl) ≠ nil :=
+          have nNewRl : tNewRl ≠ nil :=
             rotateLeftChild_preserves_no_nil tNew (by simp) nyL'
           have h1 : tNewRl.atLeft x := by
             sorry
-          have nNewL : (tNew).left nNew ≠ nil := by
+          have nNewL : tNew.left nNew ≠ nil := by
             simp_all [yL', tNewRl, tNew]
-          have nNewRlL : (tNewRl).left nNewRl ≠ nil :=
+          have nNewRlL : tNewRl.left nNewRl ≠ nil :=
             atLeft_implies_left_not_nil tNewRl x h1
           have stNewRl : tNewRl.Sorted :=
             Sorted_implies_rotateLeft_Sorted tNew nNew nNewL stNew
-          have : ((tNewRl).rotateLeftChild nNewRl nNewRlL).Sorted := Sorted_implies_rotateLeft_Sorted tNewRl nNewRl nNewRlL stNewRl
+          have : (tNewRl.rotateLeftChild nNewRl nNewRlL).Sorted := Sorted_implies_rotateLeft_Sorted tNewRl nNewRl nNewRlL stNewRl
           aesop
         | .right p =>
-          have nyL' : yL' ≠ nil := atRight_implies_not_nil yL' x (by simp_all only)
-          have nyL'R : yL'.right nyL' ≠ nil := atRight_implies_right_not_nil yL' x (by simp_all only)
-          let tNewRl := node yk yv (yL'.rotateRightChild (by sorry) nyL'R) yR
-          have nNewRl : (tNewRl) ≠ nil :=
+          let nyL' : yL' ≠ nil := atRight_implies_not_nil yL' x (by simp_all only)
+          let yL'R : SplayMap α β := yL'.right nyL'
+          have nyL'R : yL'R ≠ nil := atRight_implies_right_not_nil yL' x (by simp_all only)
+          have syL'R : yL'R.Sorted := Sorted_implies_right_Sorted yL' nyL' syL'
+          have nNewL : (tNew).left nNew ≠ nil := by
+            simp_all [yL', tNew]
+          let yL'Rr := yL'.rotateRightChild nyL' nyL'R
+          have hgtL'Rr : Forall (fun k ↦ k < yk) yL'Rr := by
+            intro x' m_xRr_yL'R
             sorry
-            -- rotateRightChild_preserves_no_nil yL' (by simp) (by sorry)
-          have soln : (((node yk yv (yL'.rotateRightChild (by sorry) (by sorry)) yR)).rotateLeftChild (sorry) (sorry)).Sorted := by
+          let tNewRl := node yk yv yL'Rr yR
+          have nNewRl : (tNewRl) ≠ nil := by
+            simp only [ne_eq, reduceCtorEq, not_false_eq_true]
+          have h1 : tNewRl.atLeft x := by
             sorry
+          have nNewRlL : (tNewRl).left nNewRl ≠ nil :=
+            atLeft_implies_left_not_nil tNewRl x h1
+          have syL'Rr : yL'Rr.Sorted := Sorted_implies_rotateRight_Sorted yL' nyL' nyL'R syL'
+          have stNewRl : tNewRl.Sorted := by
+            apply sorted_unfold
+            · exact hgtL'Rr
+            · exact hltR
+            · exact syL'Rr
+            · sorry
+          have : ((tNewRl).rotateLeftChild nNewRl nNewRlL).Sorted :=
+            Sorted_implies_rotateLeft_Sorted tNewRl nNewRl nNewRlL stNewRl
           aesop
         | .none =>
           have : yL'.locationOf x ≠ .none := splayButOne_location yL syL x m_x_yL
@@ -753,9 +774,50 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
             · exact syL
             · exact syR'
           aesop
-        | .left p => sorry
-
-        | .right p => sorry
+        | .left p =>
+          have nyR' : yR' ≠ nil := atLeft_implies_not_nil yR' x (by simp_all only)
+          let yR'L : SplayMap α β := yR'.left nyR'
+          have nyR'L : yR'L ≠ nil := atLeft_implies_left_not_nil yR' x (by simp_all only)
+          have syR'L : yR'L.Sorted := Sorted_implies_left_Sorted yR' nyR' syR'
+          have nNewR : tNew.right nNew ≠ nil := by
+            simp_all [yR', tNew]
+          let yR'Rl := yR'.rotateLeftChild nyR' nyR'L
+          have hgtR'Rl : Forall (fun k ↦ k < yk) yR'Rl := by
+            intro x' m_xRl_yR'L
+            sorry
+          let tNewRr := node yk yv yR'Rl yL
+          have nNewRr : tNewRr ≠ nil := by
+            simp only [ne_eq, reduceCtorEq, not_false_eq_true]
+          have h1 : tNewRr.atRight x := by
+            sorry
+          have nNewRrR : tNewRr.right nNewRr ≠ nil :=
+            atRight_implies_right_not_nil tNewRr x h1
+          have syR'Rl : yR'Rl.Sorted := Sorted_implies_rotateLeft_Sorted yR' nyR' nyR'L syR'
+          have stNewRl : tNewRr.Sorted := by
+            apply sorted_unfold
+            · exact hgtR'Rl
+            · sorry
+            · exact syR'Rl
+            · sorry
+          have : (tNewRr.rotateRightChild nNewRr nNewRrR).Sorted :=
+            Sorted_implies_rotateRight_Sorted tNewRr nNewRr nNewRrR stNewRl
+          aesop
+          sorry
+        | .right p =>
+          have nyR' : yR' ≠ nil := atRight_implies_not_nil yR' x (by simp_all only)
+          let tNewRr := tNew.rotateRightChild (by simp) nyR'
+          have nNewRr : tNewRr ≠ nil :=
+            rotateRightChild_preserves_no_nil tNew (by simp) nyR'
+          have h1 : tNewRr.atRight x := by
+            sorry
+          have nNewL : tNew.right nNew ≠ nil := by
+            simp_all [yR', tNewRr, tNew]
+          have nNewRrR : tNewRr.right nNewRr ≠ nil :=
+            atRight_implies_right_not_nil tNewRr x h1
+          have stNewRr : tNewRr.Sorted :=
+            Sorted_implies_rotateRight_Sorted tNew nNew nNewL stNew
+          have : (tNewRr.rotateRightChild nNewRr nNewRrR).Sorted := Sorted_implies_rotateRight_Sorted tNewRr nNewRr nNewRrR stNewRr
+          aesop
         | .none =>
           have : yR'.locationOf x ≠ .none := splayButOne_location yR syR x m_x_yR
           simp [hyR'] at this

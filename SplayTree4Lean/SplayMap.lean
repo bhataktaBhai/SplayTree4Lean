@@ -578,7 +578,7 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
             rotate_right_eq_grand_right (node yk yv yL yR') (by simp) nyR'
           have nt'R : t'.right nt' ≠ nil := by simp_all
           t'.rotateRightChild nt' nt'R
-        | (none, ⟨P, p⟩) => sorry
+        | .none => sorry
 
 /-- `splayButOne` when called at the root leaves the tree unchanged. -/
 lemma splayButOne_root_Id (t : SplayMap α β) (st : Sorted t) (h : t ≠ nil) : t.splayButOne st (t.key h) (by aesop) = t := by
@@ -674,7 +674,7 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
           · exact syL'
           · exact syR
         match hyL' : yL'.locationOf x with
-        | (Location.root, ⟨P, p⟩) =>
+        | .root _ =>
           have sNew : tNew.Sorted := by
             apply sorted_unfold
             · exact hgtL'
@@ -682,8 +682,8 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
             · exact syL'
             · exact syR
           aesop
-        | (Location.left, ⟨P, p⟩) =>
-          have nyL' : yL' ≠ nil := atLeft_implies_not_nil yL' x (by simp_all only [fancy_marriage_atLeft])
+        | .left p =>
+          have nyL' : yL' ≠ nil := atLeft_implies_not_nil yL' x (by simp_all only)
           let tNewRl := tNew.rotateLeftChild (by simp) nyL'
           have nNewRl : (tNewRl) ≠ nil :=
             rotateLeftChild_preserves_no_nil tNew (by simp) nyL'
@@ -697,17 +697,18 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
             Sorted_implies_rotateLeft_Sorted tNew nNew nNewL stNew
           have : ((tNewRl).rotateLeftChild nNewRl nNewRlL).Sorted := Sorted_implies_rotateLeft_Sorted tNewRl nNewRl nNewRlL stNewRl
           aesop
-        | (Location.right, ⟨P, p⟩) =>
-          have nyL' : yL' ≠ nil := atRight_implies_not_nil yL' x (by simp_all only [fancy_marriage_atRight])
-          have nyL'R : yL'.right nyL' ≠ nil := atRight_implies_right_not_nil yL' x (by simp_all only [fancy_marriage_atRight])
-          let tNewRl := node yk yv (yL'.rotateRightChild (by ) nyL'R) yR
+        | .right p =>
+          have nyL' : yL' ≠ nil := atRight_implies_not_nil yL' x (by simp_all only)
+          have nyL'R : yL'.right nyL' ≠ nil := atRight_implies_right_not_nil yL' x (by simp_all only)
+          let tNewRl := node yk yv (yL'.rotateRightChild (by sorry) nyL'R) yR
           have nNewRl : (tNewRl) ≠ nil :=
-            rotateRightChild_preserves_no_nil yL' (by simp) (by sorry)
+            sorry
+            -- rotateRightChild_preserves_no_nil yL' (by simp) (by sorry)
           have soln : (((node yk yv (yL'.rotateRightChild (by sorry) (by sorry)) yR)).rotateLeftChild (sorry) (sorry)).Sorted := by
             sorry
           aesop
-        | (none, ⟨P, p⟩) =>
-          have : (yL'.locationOf x).1 ≠ none := splayButOne_location yL syL x m_x_yL
+        | .none =>
+          have : yL'.locationOf x ≠ .none := splayButOne_location yL syL x m_x_yL
           simp [hyL'] at this
     else
       have hr : yk < x := by
@@ -744,7 +745,7 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
           · exact syL
           · exact syR'
         match hyR' : yR'.locationOf x with
-        | (Location.root, ⟨P, p⟩) =>
+        | .root _ =>
           have sNew : tNew.Sorted := by
             apply sorted_unfold
             · exact hltL
@@ -752,11 +753,11 @@ theorem splayButOne_preserves_sorted (t : SplayMap α β) (st : Sorted t) (x : �
             · exact syL
             · exact syR'
           aesop
-        | (Location.left, ⟨P, p⟩) => sorry
+        | .left p => sorry
 
-        | (Location.right, ⟨P, p⟩) => sorry
-        | (none, ⟨P, p⟩) =>
-          have : (yR'.locationOf x).1 ≠ none := splayButOne_location yR syR x m_x_yR
+        | .right p => sorry
+        | .none =>
+          have : yR'.locationOf x ≠ .none := splayButOne_location yR syR x m_x_yR
           simp [hyR'] at this
 
 

@@ -1,7 +1,8 @@
 import Mathlib.Order.Basic -- for LinearOrder
 import Mathlib.Data.Nat.Basic -- for LinearOrder Nat
 import Mathlib.Data.Nat.MaxPowDiv -- for maxPowDiv
-import Mathlib.Tactic -- for Linarith
+import Mathlib.Tactic.Linarith -- for linarith
+import Mathlib.Tactic.Order -- for order
 import SplayTree4Lean.lemmas
 
 universe u v
@@ -594,7 +595,17 @@ lemma splayButOne_root_Id {t : SplayMap α β} (st : Sorted t) (h : t ≠ nil) :
 
 /-- `splayButOne` never encounters the `none` case of `locationOf`. -/
 theorem splayButOne_location {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x ∈ t) :
-    (t.splayButOne st x mx).locationOf x ≠ .none := by sorry
+    (t.splayButOne st x mx).locationOf x ≠ .none := by
+  induction t with
+  | nil => trivial
+  | node yk yv yL yR iL iR =>
+    if h0 : x = yk then
+      induction h0
+      simp only [ne_eq, splayButOne, dite_true, dite_eq_ite, ite_false, ite_true]
+      intro p
+      sorry
+    else
+      sorry
 
 /-- For any `SplayMap`, its set of members is preserved upon applying `splayButOne`. -/
 theorem splayButOne_preserves_membership {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x ∈ t) :

@@ -570,7 +570,7 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
         let yL'' := yL'.rotateRightChild nyL' nyL'R
         have : yL'' ≠ nil := rotate_right_preserves_no_nil nyL' nyL'R
         (node yk yv yL'' yR).rotateLeftChild (by simp) (by simp_all)
-      | .none => sorry
+      | .none => nil
     else
       have sR : Sorted yR := right_sorted_of_sorted (by simp) st
       have mxL : x ∈ yR := mem_right_of_mem_gt_key st mx (by simp_all)
@@ -592,7 +592,7 @@ def splayButOne (t : SplayMap α β) (st : Sorted t) (x : α) (mx : x ∈ t) : S
           right_rotate_right_eq_right_right (by simp) (by simp [nyR'])
         have nt'R : t'.right nt' ≠ nil := by simp_all
         t'.rotateRightChild nt' nt'R
-      | .none => sorry
+      | .none => nil
 
 /-- `splayButOne` when called at the root leaves the tree unchanged. -/
 lemma splayButOne_root_id {t : SplayMap α β} (st : Sorted t) (nt : t ≠ nil) :
@@ -600,10 +600,39 @@ lemma splayButOne_root_id {t : SplayMap α β} (st : Sorted t) (nt : t ≠ nil) 
   match t with
   | nil => trivial
   | node yk yv yL yR =>
-    have h1 : (node yk yv yL yR).key (sorry) = yk := by -- TODO: this sorry is fine?
+    have h1 : (node yk yv yL yR).key (sorry) = yk := by -- TODO: how to fill this sorry neatly?
       simp_all only [key]
     rw [splayButOne]
     simp_all
+
+theorem splayButOne_not_none {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x ∈ t) :
+    t.splayButOne st x mx ≠ nil ∧ (t.splayButOne st x mx).locationOf x ≠ .none := by
+  induction t with
+  | nil => contradiction
+  | node yk yv yL yR iL iR =>
+    if h0 : x = yk then
+      induction h0
+      apply And.intro
+      · simp [splayButOne]
+      · intro p
+        have : (node x yv yL yR).splayButOne st x mx = node x yv yL yR := by
+          apply splayButOne_root_id
+          simp
+        rw [this] at p
+        simp [locationOf] at p
+    else if h : x < yk then
+      apply And.intro
+      · simp_all [splayButOne]
+        split
+        · simp
+        · simp [rotate_left_preserves_no_nil]
+        · simp [rotate_left_preserves_no_nil, rotate_right_preserves_no_nil]
+        · rename_i heq
+          simp [iL] at heq
+      · simp_all [splayButOne]
+        sorry
+    else
+      sorry
 
 /-- `splayButOne` never encounters the `none` case of `locationOf`. -/
 theorem splayButOne_location {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x ∈ t) :
@@ -652,7 +681,7 @@ theorem mem_iff_mem_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (m
             apply mem_rotate_right_of_mem
             simp_all
           · simp_all
-        · sorry
+        · simp_all [splayButOne_not_none]
       · simp only [instSplayMapMem, splayMem, splayButOne] at my
         simp only [h0, h, instSplayMapMem, splayButOne, dite_true, dite_eq_ite, ite_false] at my
         split at my

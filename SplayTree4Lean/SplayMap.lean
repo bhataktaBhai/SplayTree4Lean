@@ -407,6 +407,14 @@ lemma left_not_nil_of_atLeft {t : SplayMap α β} {x : α} (al : AtLeft t x) :
     intro
     trivial
 
+-- EXPERIMENT: lemmas of this kind? Omitting `t` entirely.
+omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
+/-- `AtLeft` proves the non-emptiness of the left submap. -/
+lemma left_not_nil_of_atLeft' {k : α} {v : β} {L R} {x : α} (al : AtLeft (node k v L R) x) :
+    L ≠ nil := by
+  intro
+  simp_all only [AtLeft]
+
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 /-- `AtRight` proves the non-emptiness of the right submap. -/
 lemma right_not_nil_of_atRight {t : SplayMap α β} {x : α} (ar : AtRight t x) :
@@ -1074,9 +1082,9 @@ def insert (t : SplayMap α β) (st : Sorted t) (xk : α) (xv : β) : SplayMap �
     if xk = k then
       node k xv L R
     else if xk < k then
-      node xk xv (node k v L nil) R
-    else
       node xk xv L (node k v nil R)
+    else
+      node xk xv (node k v L nil) R
 
 /-- Inserting elements into a sorted `SplayMap` returns a sorted `SplayMap`. -/
 theorem sorted_insert {t : SplayMap α β} {xk : α} {xv : β} (st : Sorted t) :
@@ -1087,20 +1095,23 @@ theorem sorted_insert {t : SplayMap α β} {xk : α} {xv : β} (st : Sorted t) :
   | node k v L R =>
     simp_all [insert, Sorted]
     match st' with
-    | .node _ _ _ _ gt_L lt_R sL sR =>
+    | .node gt_L lt_R sL sR =>
       aesop
-      · exact .node xk xv L R gt_L lt_R sL sR
-      · have xk_lt_R : ∀ y ∈ R, xk < y := by
-          intro y myR
-          exact lt_trans h_1 (lt_R y myR)
-        have xk_gt_kvL : ∀ y ∈ node k v L nil, y < xk := by
+      · exact .node gt_L lt_R sL sR
+      · have xk_gt_L : ∀ y ∈ L, y < xk := by
           intro y myL
-          simp_all
           sorry
-        exact .node xk xv (node k v L nil) R (by simp_all) xk_lt_R (.node k v L nil gt_L (by simp) sL Sorted.nil) sR
+        have xk_lt_kvR : ∀ y ∈ node k v nil R, xk < y := by
+          intro y myR
+          simp at myR
+          apply Or.elim myR <;> intro h
+          · order
+          · have : k < y := lt_R y h
+            order
+        exact .node xk_gt_L xk_lt_kvR sL (.node (by simp) lt_R Sorted.nil sR)
       · sorry
 
-/- Joins two `splayMap`s `L`, `R` where all keys in `L` are less than all keys in `R`. -/
+/- Joins two `SplayMap`s `L`, `R` where all keys in `L` are less than all keys in `R`. -/
 def join (L R : SplayMap α β) (sL : Sorted L) (sR : Sorted R) (ord : ∀ x y, x ∈ L → y ∈ R → x < y) :
     SplayMap α β :=
   match hL : L, hR : R with

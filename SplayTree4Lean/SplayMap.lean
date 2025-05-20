@@ -49,7 +49,8 @@ lemma no_mem_nil (x : α) : x ∉ (nil : SplayMap α β) := by
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
 lemma mem_no_nil {t : SplayMap α β} {x : α} (mx : x ∈ t) : t ≠ nil := by
   intro nt
-  simp_all
+  subst nt
+  exact mx
 
 /-- Returns the `(key, val)` pairs of the map in order. -/
 def toList : SplayMap α β → List (α × β)
@@ -131,7 +132,7 @@ lemma list_empty_iff (t : SplayMap α β) : t.toList = [] ↔ t = nil :=
     simp [toList]
 
 omit [LinearOrder α] [DecidableEq α] [DecidableEq β] in
-lemma key_list_empty_iff : ∀ t : SplayMap α β, t.keyList = [] ↔ t = nil := by
+lemma key_list_empty_iff (t : SplayMap α β) : t.keyList = [] ↔ t = nil := by
   simp [keyList, list_empty_iff]
 
 /-- Rotates the edge joining the supplied node and its left child, if it exists. -/
@@ -222,7 +223,7 @@ def Forall (p : α → Prop) (t : SplayMap α β) : Prop :=
 /-- An inductive definition of sortedness for `SplayMap`. It enforces uniqueness of keys by virtue of demanding a strict inequalty.  -/
 inductive Sorted : SplayMap α β → Prop
   | nil : Sorted nil
-  | node yk yv yL yR :
+  | node {yk yv yL yR} :
       Forall (fun k => k < yk) yL →
       Forall (fun k => yk < k) yR →
       Sorted yL →
@@ -230,20 +231,12 @@ inductive Sorted : SplayMap α β → Prop
     Sorted (node yk yv yL yR)
 
 omit [DecidableEq α] [DecidableEq β] in
-/-- Decomposes the `Sorted`ness condition into its constituents for easier use. -/
-theorem sorted_unfold (yk : α) (yv : β) (yL yR : SplayMap α β) :
-    Forall (fun k => k < yk) yL → Forall (fun k => yk < k) yR → Sorted yL → Sorted yR →
-    Sorted (node yk yv yL yR) := by
-  intro h1 h2 sL sR
-  exact Sorted.node yk yv yL yR h1 h2 sL sR
-
-omit [DecidableEq α] [DecidableEq β] in
 /-- If a `SplayMap` is sorted, so must be its left submap. -/
 @[simp]
 theorem left_sorted_of_sorted {t : SplayMap α β} (nt : t ≠ nil) (st : Sorted t) :
     Sorted (t.left nt) := by
   match t, st with
-  | node yk yv yL yR, .node _ _ _ _ lt_yk gt_yk sL sR =>
+  | node yk yv yL yR, .node lt_yk gt_yk sL sR =>
     rw [left]
     exact sL
 
@@ -253,7 +246,7 @@ omit [DecidableEq α] [DecidableEq β] in
 theorem right_sorted_of_sorted {t : SplayMap α β} (nt : t ≠ nil) (st : Sorted t) :
     Sorted (t.right nt) := by
   match t, st with
-  | node yk yv yL yR, .node _ _ _ _ lt_yk gt_yk sL sR =>
+  | node yk yv yL yR, .node lt_yk gt_yk sL sR =>
     rw [right]
     exact sR
 
@@ -263,7 +256,7 @@ theorem left_lt_right_of_sorted {t : SplayMap α β} (nt : t ≠ nil) (st : Sort
     ∀ x y, x ∈ t.left nt → y ∈ t.right nt → x < y := by
   intro x y mx my
   match t, st with
-  | node k v L R, .node _ _ _ _ lt_k gt_k sL sR =>
+  | node k v L R, .node lt_k gt_k sL sR =>
     have : x < k := lt_k x mx
     have : k < y := gt_k y my
     order
@@ -315,13 +308,13 @@ omit [DecidableEq α] [DecidableEq β] in
 theorem rotate_left_sorted_of_sorted {t : SplayMap α β} (nt : t ≠ nil) (nL : t.left nt ≠ nil)
     (st : Sorted t) : Sorted (rotateLeftChild t nt nL) := by
   match t, st with
-  | node yk yv (node ylk ylv yLL yLR) yR, .node _ _ _ _ lt_yk gt_yk sL sR =>
-    apply sorted_unfold
+  | node yk yv (node ylk ylv yLL yLR) yR, .node lt_yk gt_yk sL sR =>
+    apply Sorted.node
     · match sL with
-      | .node _ _ _ _ lt_ylk gt_ylk sLL sLR => exact lt_ylk
+      | .node lt_ylk gt_ylk sLL sLR => exact lt_ylk
     · intro x mx
       have gt_ylk := match sL with
-        | .node _ _ _ _ lt_ylk gt_ylk _ _ => gt_ylk
+        | .node lt_ylk gt_ylk _ _ => gt_ylk
       have : ylk < yk := by simp_all
       apply Or.elim3 mx <;> intro h
       · rw [h]
@@ -330,12 +323,12 @@ theorem rotate_left_sorted_of_sorted {t : SplayMap α β} (nt : t ≠ nil) (nL :
       · have : yk < x := gt_yk x h
         order
     · match sL with
-      | .node _ _ _ _ lt_ylk gt_ylk sLL sLR => exact sLL
-    · apply sorted_unfold
+      | .node lt_ylk gt_ylk sLL sLR => exact sLL
+    · apply Sorted.node
       · simp_all
       · assumption
       · match sL with
-        | .node _ _ _ _ lt_ylk gt_ylk sLL sLR => exact sLR
+        | .node lt_ylk gt_ylk sLL sLR => exact sLR
       · assumption
 
 omit [DecidableEq α] [DecidableEq β] in
@@ -343,11 +336,11 @@ omit [DecidableEq α] [DecidableEq β] in
 theorem rotate_right_sorted_of_sorted {t : SplayMap α β} (nt : t ≠ nil) (nR : t.right nt ≠ nil)
     (st : Sorted t) : Sorted (rotateRightChild t nt nR) := by
   match t, st with
-  | node yk yv yL (node yrk yrv yRL yRR), .node _ _ _ _ lt_yk gt_yk sL sR =>
-    apply sorted_unfold
+  | node yk yv yL (node yrk yrv yRL yRR), .node lt_yk gt_yk sL sR =>
+    apply Sorted.node
     · intro x mx
       have lt_yrk := match sR with
-        | .node _ _ _ _ lt_yrk gt_yrk _ _ => lt_yrk
+        | .node lt_yrk gt_yrk _ _ => lt_yrk
       have : yk < yrk := by simp_all
       apply Or.elim3 mx <;> intro h
       · rw [h]
@@ -356,15 +349,15 @@ theorem rotate_right_sorted_of_sorted {t : SplayMap α β} (nt : t ≠ nil) (nR 
         order
       · simp_all
     · match sR with
-      | .node _ _ _ _ lt_yrk gt_yrk sRL sRR => exact gt_yrk
-    · apply sorted_unfold
+      | .node lt_yrk gt_yrk sRL sRR => exact gt_yrk
+    · apply Sorted.node
       · assumption
       · simp_all
       · assumption
       · match sR with
-        | .node _ _ _ _ lt_yrk gt_yrk sRL sRR => exact sRL
+        | .node lt_yrk gt_yrk sRL sRR => exact sRL
     · match sR with
-      | .node _ _ _ _ lt_yrk gt_yrk sRL sRR => exact sRR
+      | .node lt_yrk gt_yrk sRL sRR => exact sRR
 
 def AtRoot (t : SplayMap α β) (x : α) : Prop :=
   match t with
@@ -473,7 +466,7 @@ lemma mem_left_of_mem_lt_key {t : SplayMap α β} {x : α} (st : Sorted t) (mx :
     · order
     · assumption
     · have : yk < x := match st with
-        | .node _ _ _ _ lt_yk gt_yk sL sR => gt_yk x hx
+        | .node lt_yk gt_yk sL sR => gt_yk x hx
       order
 
 omit [DecidableEq α] [DecidableEq β] in
@@ -486,7 +479,7 @@ lemma mem_right_of_mem_gt_key {t : SplayMap α β} {x : α} (st : Sorted t) (mx 
     apply Or.elim3 mx <;> intro hx
     · order
     · have : x < yk := match st with
-        | .node _ _ _ _ lt_yk gt_yk sL sR => lt_yk x hx
+        | .node lt_yk gt_yk sL sR => lt_yk x hx
       order
     · assumption
 
@@ -672,11 +665,11 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
           sorry
         have syL' : yL'.Sorted := hyL_to_yL' syL
         have hltR : Forall (fun k ↦ yk < k) yR := match st with
-          | .node _ _ _ _ biggerL smallerR sL sR => smallerR
+          | .node biggerL smallerR sL sR => smallerR
         have syR : Sorted yR := match st with
-          | .node _ _ _ _ biggerL smallerR sL sR => sR
+          | .node biggerL smallerR sL sR => sR
         have hgtL : Forall (fun k ↦ k < yk) yL := match st with
-          | .node _ _ _ _ biggerL smallerLR s sR => biggerL
+          | .node biggerL smallerLR s sR => biggerL
         have hgtL' : Forall (fun k ↦ k < yk) yL' := by
           intro yl' m_yl'_yL'
           have m_yl'_yL : yl' ∈ yL := (mem_iff_mem_splayButOne syL m_x_yL yl').mpr m_yl'_yL'
@@ -685,7 +678,7 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
         have nNew : tNew ≠ nil := by
           simp only [ne_eq, reduceCtorEq, not_false_eq_true]
         have stNew : tNew.Sorted := by
-          apply sorted_unfold
+          apply Sorted.node
           · exact hgtL'
           · exact hltR
           · exact syL'
@@ -694,7 +687,7 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
         match hyL' : yL'.locationOf x with
         | .root _ =>
           have sNew : tNew.Sorted := by
-            apply sorted_unfold
+            apply Sorted.node
             · exact hgtL'
             · exact hltR
             · exact syL'
@@ -735,7 +728,7 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
           have nNewRlL : (tNewRl).left nNewRl ≠ nil := left_not_nil_of_atLeft h1
           have syL'Rr : yL'Rr.Sorted := rotate_right_sorted_of_sorted nyL' nyL'R syL'
           have stNewRl : tNewRl.Sorted := by
-            apply sorted_unfold
+            apply Sorted.node
             · exact hgtL'Rr
             · exact hltR
             · exact syL'Rr
@@ -761,11 +754,11 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
         have syR : yR.Sorted := right_sorted_of_sorted (by simp) st
         have syR' : yR'.Sorted := hyR_to_yR' syR
         have hltL : Forall (fun k ↦ k < yk) yL := match st with
-          | .node _ _ _ _ biggerL smallerR sL sR => biggerL
+          | .node biggerL smallerR sL sR => biggerL
         have syL : Sorted yL := match st with
-          | .node _ _ _ _ biggerL smallerR sL sR => sL
+          | .node biggerL smallerR sL sR => sL
         have hgtR : Forall (fun k ↦ yk < k) yR := match st with
-          | .node _ _ _ _ biggerL smallerR sL sR => smallerR
+          | .node biggerL smallerR sL sR => smallerR
         have hgtR' : Forall (fun k ↦ yk < k) yR' := by
           intro yr' m_yr'_yR'
           have m_yr'_yR : yr' ∈ yR := (mem_iff_mem_splayButOne syR m_x_yR yr').mpr m_yr'_yR'
@@ -774,7 +767,7 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
         have nNew : tNew ≠ nil := by
           simp only [ne_eq, reduceCtorEq, not_false_eq_true]
         have stNew : tNew.Sorted := by
-          apply sorted_unfold
+          apply Sorted.node
           · exact hltL
           · exact hgtR'
           · exact syL
@@ -782,7 +775,7 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
         match hyR' : yR'.locationOf x with
         | .root _ =>
           have sNew : tNew.Sorted := by
-            apply sorted_unfold
+            apply Sorted.node
             · exact hltL
             · exact hgtR'
             · exact syL
@@ -807,7 +800,7 @@ theorem sorted_splayButOne {t : SplayMap α β} {x : α} (st : Sorted t) (mx : x
           have nNewRrR : tNewRr.right nNewRr ≠ nil := right_not_nil_of_atRight h1
           have syR'Rl : yR'Rl.Sorted := rotate_left_sorted_of_sorted nyR' nyR'L syR'
           have stNewRl : tNewRr.Sorted := by
-            apply sorted_unfold
+            apply Sorted.node
             · exact hgtR'Rl
             · sorry
             · exact syR'Rl
